@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <vector>
 
 #include "CaboRenderingSystem/Pipeline/render_view.h"
@@ -31,8 +32,14 @@ static_assert(sizeof(GpuLight) == 80);
 /// ライトとカメラから、影のビュー（カスケード、スポットライト）、影のテクスチャ、シェーダー用のライトのデータを作ります。
 /// パイプラインからは、影由来のRenderViewとして普通に流れるだけです。
 /// </summary>
-class ShadowSystem
+class CRS_API ShadowSystem
 {
+public:
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    ShadowSystem(const ShadowSystem &) = delete;
+    ShadowSystem &operator=(const ShadowSystem &) = delete;
+
+private:
     // 1つのカメラ分のライトの配列と影の行列
     struct BufferSet
     {

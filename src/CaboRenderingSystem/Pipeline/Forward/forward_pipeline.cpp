@@ -10,20 +10,32 @@ namespace CRS
 {
 namespace
 {
-// シェーダーは実行ファイルの隣の Shaders/ から読む
-std::wstring ShaderDirectory()
+// シェーダーを読むフォルダを決める。指定があればそれを、なければこのDLLと同じフォルダの Shaders/ を使う
+std::wstring ResolveShaderDirectory(const std::wstring &configured)
 {
+    if (!configured.empty())
+    {
+        std::wstring directory = configured;
+        if (directory.back() != L'/' && directory.back() != L'\\')
+            directory += L'/';
+        return directory;
+    }
+
+    // exeではなく、この関数が入っているモジュール（CaboRenderingSystem.dll）の場所を取る
+    HMODULE module = nullptr;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       reinterpret_cast<LPCWSTR>(&ResolveShaderDirectory), &module);
     wchar_t path[MAX_PATH] = {};
-    GetModuleFileNameW(nullptr, path, MAX_PATH);
+    GetModuleFileNameW(module, path, MAX_PATH);
     std::wstring directory(path);
     directory.resize(directory.find_last_of(L"\\/") + 1);
     return directory + L"Shaders/";
 }
 
-Shader LoadShader(IRenderDevice &device, const wchar_t *file_name, const wchar_t *entry_point,
+Shader LoadShader(IRenderDevice &device, const std::wstring &directory, const wchar_t *file_name, const wchar_t *entry_point,
                   const ShaderStage stage)
 {
-    Shader shader(device, {ShaderDirectory() + file_name, entry_point, stage, {}});
+    Shader shader(device, {directory + file_name, entry_point, stage, {}});
     if (!shader.IsValid())
         LogError("Failed to load shader '{}'", std::string(file_name, file_name + wcslen(file_name)));
     return shader;
@@ -34,15 +46,16 @@ ForwardPipeline::ForwardPipeline(IRenderDevice &device, const ForwardRenderingSe
     m_device_(device), m_settings_(settings), m_draw_list_builder_(device),
     m_shadow_system_(device, settings.shadow_map_size, settings.max_shadow_maps)
 {
-    m_standard_vertex_shader_ = LoadShader(device, L"forward_standard.hlsl", L"VSMain", ShaderStage::Vertex);
-    m_standard_pixel_shader_ = LoadShader(device, L"forward_standard.hlsl", L"PSMain", ShaderStage::Pixel);
-    m_shadow_vertex_shader_ = LoadShader(device, L"forward_standard.hlsl", L"VSShadow", ShaderStage::Vertex);
-    m_skybox_vertex_shader_ = LoadShader(device, L"skybox.hlsl", L"VSMain", ShaderStage::Vertex);
-    m_skybox_pixel_shader_ = LoadShader(device, L"skybox.hlsl", L"PSMain", ShaderStage::Pixel);
-    m_line_vertex_shader_ = LoadShader(device, L"line.hlsl", L"VSMain", ShaderStage::Vertex);
-    m_line_pixel_shader_ = LoadShader(device, L"line.hlsl", L"PSMain", ShaderStage::Pixel);
-    m_ui_vertex_shader_ = LoadShader(device, L"ui.hlsl", L"VSMain", ShaderStage::Vertex);
-    m_ui_pixel_shader_ = LoadShader(device, L"ui.hlsl", L"PSMain", ShaderStage::Pixel);
+    const std::wstring shader_directory = ResolveShaderDirectory(settings.shader_directory);
+    m_standard_vertex_shader_ = LoadShader(device, shader_directory, L"forward_standard.hlsl", L"VSMain", ShaderStage::Vertex);
+    m_standard_pixel_shader_ = LoadShader(device, shader_directory, L"forward_standard.hlsl", L"PSMain", ShaderStage::Pixel);
+    m_shadow_vertex_shader_ = LoadShader(device, shader_directory, L"forward_standard.hlsl", L"VSShadow", ShaderStage::Vertex);
+    m_skybox_vertex_shader_ = LoadShader(device, shader_directory, L"skybox.hlsl", L"VSMain", ShaderStage::Vertex);
+    m_skybox_pixel_shader_ = LoadShader(device, shader_directory, L"skybox.hlsl", L"PSMain", ShaderStage::Pixel);
+    m_line_vertex_shader_ = LoadShader(device, shader_directory, L"line.hlsl", L"VSMain", ShaderStage::Vertex);
+    m_line_pixel_shader_ = LoadShader(device, shader_directory, L"line.hlsl", L"PSMain", ShaderStage::Pixel);
+    m_ui_vertex_shader_ = LoadShader(device, shader_directory, L"ui.hlsl", L"VSMain", ShaderStage::Vertex);
+    m_ui_pixel_shader_ = LoadShader(device, shader_directory, L"ui.hlsl", L"PSMain", ShaderStage::Pixel);
 
     // テクスチャが指定されていないスロット用の1x1の白
     constexpr uint32_t white = 0xFFFFFFFF;

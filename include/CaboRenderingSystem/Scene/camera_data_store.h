@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <array>
 #include <memory>
 #include <vector>
@@ -62,8 +63,15 @@ struct CameraSnapshot
 /// <summary>
 /// カメラのデータを持つストアです。ゲーム側が毎フレームUpdateし、描画の前にスナップショットを取ります。
 /// </summary>
-class CameraDataStore
+class CRS_API CameraDataStore
 {
+public:
+    CameraDataStore() = default;
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    CameraDataStore(const CameraDataStore &) = delete;
+    CameraDataStore &operator=(const CameraDataStore &) = delete;
+
+private:
     struct Entry
     {
         CameraCommon common;

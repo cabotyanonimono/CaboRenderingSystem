@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <vector>
 
 #include "CaboRenderingSystem/Core/math_types.h"
@@ -42,8 +43,15 @@ struct LightData
 /// <summary>
 /// ライトのデータを持つストアです。描画の前にスナップショットを取り、ShadowSystemがライトの配列と影を作ります。
 /// </summary>
-class LightDataStore
+class CRS_API LightDataStore
 {
+public:
+    LightDataStore() = default;
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    LightDataStore(const LightDataStore &) = delete;
+    LightDataStore &operator=(const LightDataStore &) = delete;
+
+private:
     SlotPool<LightTag, LightData> m_lights_;
 
 public:

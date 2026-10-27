@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <memory>
 #include <vector>
 
@@ -51,8 +52,15 @@ struct MeshRendererData
 /// <summary>
 /// メッシュの描画データを持つストアです。ゲーム側が登録・更新し、エンジンがスナップショットを取ります。
 /// </summary>
-class MeshRendererDataStore
+class CRS_API MeshRendererDataStore
 {
+public:
+    MeshRendererDataStore() = default;
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    MeshRendererDataStore(const MeshRendererDataStore &) = delete;
+    MeshRendererDataStore &operator=(const MeshRendererDataStore &) = delete;
+
+private:
     SlotPool<MeshRendererTag, MeshRendererData> m_data_;
 
 public:

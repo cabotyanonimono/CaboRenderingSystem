@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <array>
 #include <cstdint>
 #include <string>
@@ -324,7 +325,7 @@ struct RenderState
 /// <summary>
 /// PSOを作るときの設定です。IRenderDevice::CreatePipelineStateは同じ設定のPSOをキャッシュから返します。
 /// </summary>
-struct PipelineStateDesc
+struct CRS_API PipelineStateDesc
 {
     ShaderHandle vertex_shader;
     // 無効なハンドルなら、ピクセルシェーダーなし（影などの深度だけの描画）

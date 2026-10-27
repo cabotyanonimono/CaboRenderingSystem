@@ -121,13 +121,14 @@ void RenderEngine::RenderFrame(const float time, const float delta_time)
 }
 
 std::unique_ptr<RenderEngine> CreateDefaultRenderEngine(void *native_window, const uint32_t width,
-                                                        const uint32_t height)
+                                                        const uint32_t height,
+                                                        const ForwardRenderingSettings &settings)
 {
     auto device = D3D12RenderDevice::Create(static_cast<HWND>(native_window), width, height);
     if (device == nullptr)
         return nullptr;
 
-    auto pipeline = std::make_unique<ForwardPipeline>(*device);
+    auto pipeline = std::make_unique<ForwardPipeline>(*device, settings);
     return std::make_unique<RenderEngine>(std::move(device), std::move(pipeline), width, height);
 }
 }

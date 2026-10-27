@@ -1,5 +1,7 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "CaboRenderingSystem/Pipeline/i_render_pipeline.h"
@@ -35,13 +37,21 @@ struct ForwardRenderingSettings
     uint32_t shadow_map_size = 2048;
     // シャドウマップの最大枚数（平行光源は3枚、スポットライトは1枚使う）
     uint32_t max_shadow_maps = 10;
+    // 組み込みシェーダー（.hlsl）を読むフォルダ。空なら CaboRenderingSystem.dll と同じフォルダの Shaders/ を使う
+    std::wstring shader_directory;
 };
 
 /// <summary>
 /// Forwardパイプラインです。カメラごとに、影のビューを描いてから、登録されたパスを登録順で実行します。
 /// </summary>
-class ForwardPipeline final : public IRenderPipeline
+class CRS_API ForwardPipeline final : public IRenderPipeline
 {
+public:
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    ForwardPipeline(const ForwardPipeline &) = delete;
+    ForwardPipeline &operator=(const ForwardPipeline &) = delete;
+
+private:
     IRenderDevice &m_device_;
     ForwardRenderingSettings m_settings_;
     std::vector<std::unique_ptr<IRenderPass>> m_passes_;

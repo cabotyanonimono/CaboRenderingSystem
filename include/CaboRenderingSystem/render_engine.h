@@ -1,7 +1,9 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <memory>
 
 #include "CaboRenderingSystem/Material/material.h"
+#include "CaboRenderingSystem/Pipeline/Forward/forward_pipeline.h"
 #include "CaboRenderingSystem/Pipeline/i_render_pipeline.h"
 #include "CaboRenderingSystem/RHI/gpu_resources.h"
 #include "CaboRenderingSystem/RHI/i_render_device.h"
@@ -18,7 +20,7 @@ namespace CRS
 /// 全体と具象型を知るのはここだけです。
 /// <para>ゲーム側は各ストア（Meshes、Cameras、Lightsなど）に登録・更新し、Renderの中でそのスナップショットを描きます。</para>
 /// </summary>
-class RenderEngine
+class CRS_API RenderEngine
 {
     // デバイスはすべてのラッパーより後に破棄するので、最初に宣言する
     std::unique_ptr<IRenderDevice> m_device_;
@@ -192,6 +194,8 @@ public:
 /// <summary>
 /// D3D12デバイスとForwardパイプラインで組み立てたRenderEngineを作ります。失敗した場合はnullptrを返します。
 /// パスは標準の5つ（Shadow、Skybox、Forward、Line、UI）が登録済みです。
+/// <para>settings.shader_directory でシェーダーの場所を変えられます（空ならDLLの隣の Shaders/）。</para>
 /// </summary>
-std::unique_ptr<RenderEngine> CreateDefaultRenderEngine(void *native_window, uint32_t width, uint32_t height);
+CRS_API std::unique_ptr<RenderEngine> CreateDefaultRenderEngine(void *native_window, uint32_t width, uint32_t height,
+                                                        const ForwardRenderingSettings &settings = {});
 }

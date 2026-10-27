@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <unordered_map>
 #include <vector>
 
@@ -29,7 +30,7 @@ using DrawList = std::vector<DrawItem>;
 /// <summary>
 /// ビューから見えるメッシュを絞り込みます。
 /// </summary>
-class CullingStage
+class CRS_API CullingStage
 {
 public:
     /// <summary>
@@ -42,8 +43,14 @@ public:
 /// パスタグでマテリアルを引き、描画リストを作ります。そのパスのエントリが無いマテリアルは除外します。
 /// PSOはマテリアルのパスと描画先の設定から、描画時に解決します。
 /// </summary>
-class DrawListBuilder
+class CRS_API DrawListBuilder
 {
+public:
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    DrawListBuilder(const DrawListBuilder &) = delete;
+    DrawListBuilder &operator=(const DrawListBuilder &) = delete;
+
+private:
     // PSOを決める要素の組み合わせ。デバイス側のキャッシュより手前で引き、PipelineStateDescを作る手間を省く
     struct PipelineKey
     {

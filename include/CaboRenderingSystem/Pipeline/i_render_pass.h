@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include "CaboRenderingSystem/Material/material.h"
 #include "CaboRenderingSystem/Pipeline/render_stages.h"
 #include "CaboRenderingSystem/Pipeline/render_view.h"
@@ -59,5 +60,5 @@ public:
 /// <summary>
 /// メッシュを1つ描くためのバインドを作ります。ShadowとForwardで共有します。
 /// </summary>
-Bindings MakeMeshBindings(const PassContext &context, const DrawItem &item, ObjectConstants &object_constants);
+CRS_API Bindings MakeMeshBindings(const PassContext &context, const DrawItem &item, ObjectConstants &object_constants);
 }

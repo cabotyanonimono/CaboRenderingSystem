@@ -11,8 +11,7 @@ find_package(directx-dxc CONFIG REQUIRED)
 file(GLOB_RECURSE CRS_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_library(CaboRenderingSystem SHARED ${CRS_SOURCES})
 
-# __declspec(dllexport) を書かずに、全シンボルをDLLから公開する（.lib も生成される）
-set_target_properties(CaboRenderingSystem PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+# DLLから公開するのは CRS_API（include/CaboRenderingSystem/export.h）を付けたものだけ
 
 # include/ : 利用側に見せるヘッダ（DX12の型を含まない）
 # src/     : 内部用（RHI/D3D12 など）。利用側には見えない

@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <array>
 #include <optional>
 #include <string>
@@ -39,7 +40,7 @@ struct MaterialProperty
 /// 定数とテクスチャは名前で扱い、位置はシェーダーのリフレクションから引きます。
 /// space0 の cbuffer は名前に関係なくすべてマテリアルの定数です（b0..b3 まで）。
 /// </summary>
-class Material
+class CRS_API Material
 {
     // パスごとのシェーダーと描画設定。使わないパスは空
     std::array<std::optional<MaterialPass>, static_cast<size_t>(PassTag::Count)> m_passes_;
@@ -153,8 +154,15 @@ public:
 /// <summary>
 /// マテリアルの本体を持ちます。メッシュのデータはMaterialIdだけを持ち、ここで引きます。
 /// </summary>
-class MaterialRegistry
+class CRS_API MaterialRegistry
 {
+public:
+    MaterialRegistry() = default;
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    MaterialRegistry(const MaterialRegistry &) = delete;
+    MaterialRegistry &operator=(const MaterialRegistry &) = delete;
+
+private:
     SlotPool<MaterialTag, Material> m_materials_;
 
 public:

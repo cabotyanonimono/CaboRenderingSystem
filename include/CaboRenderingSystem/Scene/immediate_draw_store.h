@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <array>
 #include <vector>
 
@@ -42,8 +43,15 @@ struct UiBatch
 /// <summary>
 /// 毎フレーム作り直す描画（デバッグ表示の線、UI）を集めます。フレームの終わりに空にします。
 /// </summary>
-class ImmediateDrawStore
+class CRS_API ImmediateDrawStore
 {
+public:
+    ImmediateDrawStore() = default;
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    ImmediateDrawStore(const ImmediateDrawStore &) = delete;
+    ImmediateDrawStore &operator=(const ImmediateDrawStore &) = delete;
+
+private:
     std::vector<LineVertex> m_lines_;
     std::vector<UiVertex> m_ui_vertices_;
     std::vector<UiBatch> m_ui_batches_;
