@@ -6,9 +6,6 @@
 #include "CaboRenderingSystem/Core/log.h"
 #include "CaboRenderingSystem/RHI/D3D12/d3d12_command_list.h"
 
-#pragma comment(lib, "d3d12.lib")
-#pragma comment(lib, "dxgi.lib")
-
 namespace CRS
 {
 namespace

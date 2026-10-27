@@ -6,8 +6,6 @@
 
 #include "CaboRenderingSystem/Core/log.h"
 
-#pragma comment(lib, "dxcompiler.lib")
-
 namespace CRS
 {
 namespace
