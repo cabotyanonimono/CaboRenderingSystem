@@ -1,14 +1,11 @@
 # CaboRenderingSystem は DLL としてだけ提供する
 vcpkg_check_linkage(ONLY_DYNAMIC_LIBRARY)
 
-# 新しいバージョンを使うときは、REF を push 済みのコミットに変え、SHA512 を 0 にして一度インストールする。
-# vcpkg がエラーで正しいハッシュ（Actual hash）を表示するので、それを SHA512 に貼る。
-vcpkg_from_github(
+# 新しいバージョンを出すときは、REF を push 済みのコミットに変え、versions/ も更新する（README 参照）
+vcpkg_from_git(
     OUT_SOURCE_PATH SOURCE_PATH
-    REPO cabotyanonimono/CaboRenderingSystem
+    URL https://github.com/cabotyanonimono/CaboRenderingSystem.git
     REF 5c09f279957fd0f04b3f4729e11d9103819e97b9
-    SHA512 0
-    HEAD_REF main
 )
 
 vcpkg_cmake_configure(
