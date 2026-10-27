@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+# 公開ヘッダが SimpleMath を使うので、利用側にも DirectXTK12 が必要
+find_dependency(directxtk12 CONFIG)
+
+include("${CMAKE_CURRENT_LIST_DIR}/CaboRenderingSystemTargets.cmake")
+
+# 組み込みシェーダーの場所。exe の隣の Shaders/ にコピーするか、ForwardRenderingSettings::shader_directory に渡す
+set(CaboRenderingSystem_SHADER_DIR "${CMAKE_CURRENT_LIST_DIR}/Shaders")
+
+check_required_components(CaboRenderingSystem)
