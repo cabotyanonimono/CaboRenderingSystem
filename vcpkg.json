@@ -1,0 +1,9 @@
+{
+  "name": "cabo-rendering-system",
+  "version": "0.1.0",
+  "dependencies": [
+    "directx-headers",
+    "directxtk12",
+    "directx-dxc"
+  ]
+}
