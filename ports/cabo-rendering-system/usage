@@ -1,0 +1,8 @@
+cabo-rendering-system provides CMake targets:
+
+    find_package(CaboRenderingSystem CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE CRS::CaboRenderingSystem)
+
+Copy ${CaboRenderingSystem_SHADER_DIR} next to your executable as Shaders/,
+or pass it to ForwardRenderingSettings::shader_directory.
+dxil.dll (from directx-dxc) must also be placed next to your executable.

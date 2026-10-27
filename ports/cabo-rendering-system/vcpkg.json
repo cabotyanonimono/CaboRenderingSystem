@@ -1,0 +1,20 @@
+{
+  "name": "cabo-rendering-system",
+  "version": "0.1.0",
+  "description": "DirectX 12 rendering system (CaboRenderingSystem)",
+  "homepage": "https://github.com/cabotyanonimono/CaboRenderingSystem",
+  "supports": "windows & x64 & !uwp",
+  "dependencies": [
+    "directx-headers",
+    "directxtk12",
+    "directx-dxc",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}
