@@ -40,6 +40,8 @@ std::wstring ToWide(const std::string &value)
 }
 }
 
+D3D12RenderDevice::D3D12RenderDevice() = default;
+
 std::unique_ptr<D3D12RenderDevice> D3D12RenderDevice::Create(const HWND hwnd, const uint32_t width,
                                                              const uint32_t height)
 {

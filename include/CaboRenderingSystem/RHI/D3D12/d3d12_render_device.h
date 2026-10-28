@@ -185,7 +185,8 @@ private:
     uint64_t m_next_readback_id_ = 1;
     std::unordered_map<uint64_t, PendingReadback> m_readbacks_;
 
-    D3D12RenderDevice() = default;
+    // 定義は .cpp 側（D3D12CommandList が不完全型のヘッダで実体化させないため）
+    D3D12RenderDevice();
 
     // デバイス、キュー、スワップチェーン、ヒープ、ルートシグネチャ、バックバッファを順に作る
     bool Init(HWND hwnd, uint32_t width, uint32_t height);
