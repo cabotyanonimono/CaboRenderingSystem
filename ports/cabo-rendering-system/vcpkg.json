@@ -1,6 +1,6 @@
 {
   "name": "cabo-rendering-system",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "DirectX 12 rendering system (CaboRenderingSystem)",
   "homepage": "https://github.com/cabotyanonimono/CaboRenderingSystem",
   "supports": "windows & x64 & !uwp",
