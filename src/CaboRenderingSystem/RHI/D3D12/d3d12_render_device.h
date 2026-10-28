@@ -256,6 +256,14 @@ public:
     void Present() override;
     TextureHandle GetBackBuffer() const override;
     Format GetBackBufferFormat() const override;
+    void *GetNativeDevice() const override
+    {
+        return m_device_.Get();
+    }
+    void *GetNativeCommandQueue() const override
+    {
+        return m_queue_.Get();
+    }
     uint32_t GetFrameIndex() const override;
     void Resize(uint32_t width, uint32_t height) override;
     void WaitIdle() override;

@@ -103,6 +103,18 @@ public:
     /// バックバッファのフォーマットです（PSOの描画先の設定に使います）。
     /// </summary>
     virtual Format GetBackBufferFormat() const = 0;
+
+    // ---- ネイティブAPIへのアクセス（ImGuiなど外部ライブラリとの連携用） ----
+    // 戻り値はAddRefしていないので、Releaseしないでください。デバイスが生きている間だけ有効です。
+
+    /// <summary>
+    /// ネイティブのデバイスです。D3D12では ID3D12Device* にキャストして使います。
+    /// </summary>
+    virtual void *GetNativeDevice() const = 0;
+    /// <summary>
+    /// ネイティブのコマンドキューです。D3D12では ID3D12CommandQueue* にキャストして使います。
+    /// </summary>
+    virtual void *GetNativeCommandQueue() const = 0;
     /// <summary>
     /// 今のフレームの番号（0..kMaxFramesInFlight-1）です。フレームごとのコピーを選ぶのに使います。
     /// </summary>

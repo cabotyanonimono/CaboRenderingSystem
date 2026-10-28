@@ -12,6 +12,14 @@ public:
     virtual ~ICommandList() = default;
 
     /// <summary>
+    /// ネイティブのコマンドリストです。D3D12では ID3D12GraphicsCommandList* にキャストして使います。
+    /// AddRefしていないのでReleaseしないでください。記録中（BeginFrame〜EndFrame）だけ有効です。
+    /// <para>直接コマンドを積むと、CRS側が覚えている状態（バインド中のPSOやルートシグネチャ、
+    /// ディスクリプタヒープ、リソースの状態）とずれることがあります。使ったあとは必要な状態を戻してください。</para>
+    /// </summary>
+    virtual void *GetNativeCommandList() const = 0;
+
+    /// <summary>
     /// テクスチャの状態を切り替えます（描画先にする前、シェーダーで読む前など）。
     /// 今の状態と同じ場合と、外部から取り込んだ状態固定のテクスチャの場合は何もしません。
     /// </summary>

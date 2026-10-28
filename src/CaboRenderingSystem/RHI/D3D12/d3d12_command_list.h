@@ -23,6 +23,11 @@ class D3D12CommandList final : public ICommandList
     void BindRootState();
 
 public:
+    void *GetNativeCommandList() const override
+    {
+        return m_list_.Get();
+    }
+
     /// <summary>
     /// デバイスが作ったコマンドリストを包みます。D3D12RenderDeviceの中からだけ作ります。
     /// </summary>
