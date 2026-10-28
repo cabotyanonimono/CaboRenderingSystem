@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include <array>
 #include <functional>
 #include <memory>
@@ -102,8 +103,14 @@ struct D3D12Sampler
 /// <summary>
 /// IRenderDeviceのD3D12実装です。D3D12を知るのはRHI/D3D12の中だけです。
 /// </summary>
-class D3D12RenderDevice final : public IRenderDevice
+class CRS_API D3D12RenderDevice final : public IRenderDevice
 {
+public:
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    D3D12RenderDevice(const D3D12RenderDevice &) = delete;
+    D3D12RenderDevice &operator=(const D3D12RenderDevice &) = delete;
+
+private:
     friend class D3D12CommandList;
 
     // アップロード用のリングの1ページ。先頭から順に切り出し、そのフレームのGPU処理が終わったら巻き戻す

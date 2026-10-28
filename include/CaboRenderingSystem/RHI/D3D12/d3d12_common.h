@@ -1,5 +1,5 @@
 ﻿#pragma once
-// D3D12の型を知ってよいのは RHI/D3D12 の中だけです。
+// D3D12の型はこのフォルダ（RHI/D3D12）にまとめます。利用側でD3D12を直接使うときだけincludeしてください。
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif

@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "CaboRenderingSystem/export.h"
 #include "CaboRenderingSystem/RHI/i_command_list.h"
 #include "CaboRenderingSystem/RHI/D3D12/d3d12_common.h"
 
@@ -9,8 +10,14 @@ class D3D12RenderDevice;
 /// <summary>
 /// ICommandListのD3D12実装です。ルートシグネチャとディスクリプタヒープの設定はこの中に隠します。
 /// </summary>
-class D3D12CommandList final : public ICommandList
+class CRS_API D3D12CommandList final : public ICommandList
 {
+public:
+    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
+    D3D12CommandList(const D3D12CommandList &) = delete;
+    D3D12CommandList &operator=(const D3D12CommandList &) = delete;
+
+private:
     D3D12RenderDevice &m_device_;
     ComPtr<ID3D12GraphicsCommandList> m_list_;
 

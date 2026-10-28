@@ -3,6 +3,8 @@
 include(CMakeFindDependencyMacro)
 # 公開ヘッダが SimpleMath を使うので、利用側にも DirectXTK12 が必要
 find_dependency(directxtk12 CONFIG)
+# 公開ヘッダ（RHI/D3D12）が d3dx12.h を使うので DirectX-Headers も必要
+find_dependency(directx-headers CONFIG)
 
 include("${CMAKE_CURRENT_LIST_DIR}/CaboRenderingSystemTargets.cmake")
 

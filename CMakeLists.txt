@@ -14,8 +14,8 @@ add_library(CRS::CaboRenderingSystem ALIAS CaboRenderingSystem)
 
 # DLLから公開するのは CRS_API（include/CaboRenderingSystem/export.h）を付けたものだけ
 
-# include/ : 利用側に見せるヘッダ（DX12の型を含まない）
-# src/     : 内部用（RHI/D3D12 など）。利用側には見えない
+# include/ : 利用側に見せるヘッダ（DX12の型は include/.../RHI/D3D12 だけ）
+# src/     : 内部用。利用側には見えない
 target_include_directories(CaboRenderingSystem
         PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                 $<INSTALL_INTERFACE:include>
@@ -23,11 +23,12 @@ target_include_directories(CaboRenderingSystem
 target_precompile_headers(CaboRenderingSystem PRIVATE src/pch.h)
 target_compile_options(CaboRenderingSystem PRIVATE /utf-8)
 
+# RHI/D3D12 のヘッダを公開しているので、DirectX-Headers と d3d12 / dxgi も利用側に伝える
 target_link_libraries(CaboRenderingSystem
         PUBLIC  Microsoft::DirectXTK12
-        PRIVATE Microsoft::DirectX-Headers
-        Microsoft::DirectXShaderCompiler
-        d3d12 dxgi dxguid)
+                Microsoft::DirectX-Headers
+                d3d12 dxgi dxguid
+        PRIVATE Microsoft::DirectXShaderCompiler)
 
 # ---- インストール（vcpkg などから find_package(CaboRenderingSystem) で使えるようにする） ----
 include(GNUInstallDirs)
