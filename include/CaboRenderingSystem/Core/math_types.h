@@ -4,7 +4,7 @@
 #define NOMINMAX
 #endif
 #include <DirectXCollision.h>
-#include <SimpleMath.h>
+#include <directxtk12/SimpleMath.h>
 
 namespace CRS
 {
