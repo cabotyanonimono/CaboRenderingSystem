@@ -14,10 +14,13 @@ enum class RenderViewKind : uint8_t
 {
     Camera,
     Shadow,
+    Composite,
 };
 
 /// <summary>
 /// 「どこから、どこへ、何を描くか」です。カメラ由来も影由来も同じ形にし、同じ経路で処理します。
+/// depth_sliceは深度の描画先が配列テクスチャの場合のスライス、scene_colorはCompositeのビューが読むHDRのシーンカラーです。
+/// camera_settingsはカメラ由来のビューのパイプライン固有の設定で、影のビューではnullptrです。
 /// </summary>
 struct RenderView
 {
@@ -34,7 +37,7 @@ struct RenderView
 
     TextureHandle color_target;
     TextureHandle depth_target;
-    // 深度の描画先が配列テクスチャの場合のスライス
+    TextureHandle scene_color;
     uint32_t depth_slice = kAllSlices;
     Format color_format = Format::Unknown;
     Format depth_format = Format::Unknown;
@@ -44,14 +47,10 @@ struct RenderView
     std::array<float, 4> clear_color = {0, 0, 0, 1};
 
     uint32_t culling_mask = UINT32_MAX;
-    // 視錐台カリングをするかどうか（影のビューは、ビューの外から影を落とすものがあるので行わない）
     bool frustum_cull = true;
-    // 深度だけを描くビュー（影など）
     bool depth_only = false;
-    // デバッグ表示の線とUIを描くかどうか
     bool draw_overlays = false;
 
-    // カメラ由来のビューの場合の、パイプライン固有の設定（影のビューではnullptr）
     const ICameraSettings *camera_settings = nullptr;
 };
 
@@ -73,11 +72,8 @@ struct LightingConstants
 struct FrameLighting
 {
     LightingConstants constants;
-    // StructuredBuffer<GpuLight>（t0, space1）
     BufferHandle lights;
-    // 影の行列。GpuLight::shadow_indexから続けて並ぶ（t1, space1）
     BufferHandle light_view_projections;
-    // 全ライトの影を入れたTexture2DArray（t2, space1）
     TextureHandle shadow_maps;
 };
 
@@ -91,7 +87,6 @@ struct ViewConstants
     Matrix view_projection;
     Matrix previous_view_projection;
     Vector4 camera_position;
-    // x: 起動からの時間, y: 前フレームからの時間
     Vector4 time;
 };
 
@@ -100,13 +95,11 @@ struct ViewConstants
 /// </summary>
 struct ObjectConstants
 {
-    // flagsのビット。立っていれば頂点シェーダーでボーン行列（t3, space1）を使ってスキニングする
     static constexpr uint32_t kFlagSkinned = 1;
 
     Matrix world;
     Matrix previous_world;
     uint32_t flags = 0;
-    // HLSLのcbufferの16バイト境界に合わせる
     uint32_t padding[3] = {};
 };
 }

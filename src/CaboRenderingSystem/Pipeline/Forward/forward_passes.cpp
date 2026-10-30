@@ -1,11 +1,11 @@
 ﻿#include "pch.h"
 #include "CaboRenderingSystem/Pipeline/Forward/forward_passes.h"
+#include "CaboRenderingSystem/Pipeline/Forward/forward_pipeline.h"
 
 namespace CRS
 {
 namespace
 {
-// シェーダー側のt (space1)の割り当て
 constexpr uint32_t kFrameSlotLights = 0;
 constexpr uint32_t kFrameSlotLightViewProjections = 1;
 constexpr uint32_t kFrameSlotShadowMaps = 2;
@@ -85,18 +85,15 @@ Bindings MakeMeshBindings(const PassContext &context, const DrawItem &item, Obje
 
     bindings.frame_resources[kFrameSlotLights].buffer = context.lighting.lights;
     bindings.frame_resources[kFrameSlotLightViewProjections].buffer = context.lighting.light_view_projections;
-    // 影を描いている最中は、影のテクスチャを読まない
     if (context.view.kind != RenderViewKind::Shadow)
         bindings.frame_resources[kFrameSlotShadowMaps].texture = context.lighting.shadow_maps;
     bindings.frame_resources[kFrameSlotBones].buffer = mesh.bone_buffer;
-    // 前フレームのボーン行列が無ければ今の値を使う（モーションベクトルはworldの差分だけになる）
     bindings.frame_resources[kFrameSlotPreviousBones].buffer =
         mesh.previous_bone_buffer.IsValid() ? mesh.previous_bone_buffer : mesh.bone_buffer;
     PrepareMaterialResources(context, bindings);
     return bindings;
 }
 
-// ---- ShadowPass ----
 
 PassTag ShadowPass::GetTag() const
 {
@@ -139,7 +136,6 @@ void ShadowPass::Execute(const PassContext &context)
     command_list.EndDebugEvent();
 }
 
-// ---- SkyboxPass ----
 
 SkyboxPass::SkyboxPass(const ShaderHandle vertex_shader, const ShaderHandle pixel_shader) :
     m_vertex_shader_(vertex_shader), m_pixel_shader_(pixel_shader)
@@ -162,7 +158,6 @@ bool SkyboxPass::AcceptsView(const RenderView &view, const FrameSnapshot &frame)
 
 void SkyboxPass::Execute(const PassContext &context)
 {
-    // 36頂点の立方体（内側から見る）
     static constexpr Vector3 kCube[36] = {
         {-1, 1, -1}, {1, 1, -1}, {1, -1, -1}, {-1, 1, -1}, {1, -1, -1}, {-1, -1, -1},
         {1, 1, 1}, {-1, 1, 1}, {-1, -1, 1}, {1, 1, 1}, {-1, -1, 1}, {1, -1, 1},
@@ -183,7 +178,6 @@ void SkyboxPass::Execute(const PassContext &context)
     if (!pipeline_state.IsValid())
         return;
 
-    // カメラの位置に関係なく見えるよう、Viewの平行移動を除く
     auto view_constants = context.view_constants;
     auto rotation_only = view.view;
     rotation_only._41 = rotation_only._42 = rotation_only._43 = 0.0f;
@@ -206,7 +200,6 @@ void SkyboxPass::Execute(const PassContext &context)
     command_list.EndDebugEvent();
 }
 
-// ---- ForwardPass ----
 
 PassTag ForwardPass::GetTag() const
 {
@@ -243,7 +236,6 @@ void ForwardPass::Execute(const PassContext &context)
     command_list.EndDebugEvent();
 }
 
-// ---- LinePass ----
 
 LinePass::LinePass(const ShaderHandle vertex_shader, const ShaderHandle pixel_shader) :
     m_vertex_shader_(vertex_shader), m_pixel_shader_(pixel_shader)
@@ -304,7 +296,64 @@ void LinePass::Execute(const PassContext &context)
     command_list.EndDebugEvent();
 }
 
-// ---- UiPass ----
+
+TonemapPass::TonemapPass(const ShaderHandle vertex_shader, const ShaderHandle pixel_shader) :
+    m_vertex_shader_(vertex_shader), m_pixel_shader_(pixel_shader)
+{}
+
+PassTag TonemapPass::GetTag() const
+{
+    return PassTag::Forward;
+}
+
+bool TonemapPass::UsesDrawList() const
+{
+    return false;
+}
+
+bool TonemapPass::AcceptsView(const RenderView &view, const FrameSnapshot &) const
+{
+    return view.kind == RenderViewKind::Composite && view.color_target.IsValid() && view.scene_color.IsValid();
+}
+
+void TonemapPass::Execute(const PassContext &context)
+{
+    struct TonemapConstants
+    {
+        float exposure = 1.0f;
+        float padding[3] = {};
+    };
+
+    auto &command_list = context.command_list;
+    const auto &view = context.view;
+
+    auto desc = MakeSimpleDesc(view, m_vertex_shader_, m_pixel_shader_, false);
+    desc.render_state.blend = view.color_load == LoadOp::Load ? BlendMode::AlphaBlend : BlendMode::Opaque;
+    desc.render_state.cull = CullMode::None;
+    desc.render_state.depth = {false, false, CompareOp::Always};
+    const auto pipeline_state = context.device.CreatePipelineState(desc);
+    if (!pipeline_state.IsValid())
+        return;
+
+    TonemapConstants constants;
+    if (const auto settings = static_cast<const ForwardCameraSettings *>(view.camera_settings))
+        constants.exposure = settings->exposure;
+
+    command_list.BeginDebugEvent("CRS Tonemap");
+    command_list.Transition(view.scene_color, ResourceState::ShaderResource);
+    BeginColorPass(context, false);
+
+    Bindings bindings;
+    bindings.constants[0] = ConstantBinding::FromValue(constants);
+    bindings.resources[0].texture = view.scene_color;
+
+    command_list.SetPipelineState(pipeline_state);
+    command_list.SetBindings(bindings);
+    command_list.Draw(3);
+
+    command_list.EndRenderPass();
+    command_list.EndDebugEvent();
+}
 
 UiPass::UiPass(const ShaderHandle vertex_shader, const ShaderHandle pixel_shader) :
     m_vertex_shader_(vertex_shader), m_pixel_shader_(pixel_shader)
@@ -322,7 +371,7 @@ bool UiPass::UsesDrawList() const
 
 bool UiPass::AcceptsView(const RenderView &view, const FrameSnapshot &frame) const
 {
-    return view.kind == RenderViewKind::Camera && view.draw_overlays && frame.immediate != nullptr &&
+    return view.kind == RenderViewKind::Composite && view.draw_overlays && frame.immediate != nullptr &&
            !frame.immediate->UiBatches().empty();
 }
 
@@ -343,7 +392,6 @@ void UiPass::Execute(const PassContext &context)
             },
             sizeof(UiVertex)
         };
-        // UIは基本的に半透明で重ねる
         desc.render_state.blend = blend == BlendMode::Opaque ? BlendMode::AlphaBlend : blend;
         desc.render_state.cull = CullMode::None;
         desc.render_state.depth = {false, false, CompareOp::Always};
@@ -376,7 +424,6 @@ void UiPass::Execute(const PassContext &context)
         const auto pass = material ? material->GetPass(PassTag::Forward) : nullptr;
         if (pass != nullptr)
         {
-            // UI用のShaderのMaterial: そのShaderと、Materialの定数・テクスチャで描く
             pipeline_state = context.device.CreatePipelineState(
                 make_desc(pass->vertex_shader, pass->pixel_shader, pass->render_state.blend));
             if (!pipeline_state.IsValid())
@@ -386,7 +433,6 @@ void UiPass::Execute(const PassContext &context)
             material->BindResources(bindings, context.default_texture);
         }
 
-        // _MainTex (t0) がMaterialで指定されていなければ、四角形のテクスチャを使う
         if (batch.texture.IsValid() && (material == nullptr || !material->IsResourceSet(0)))
             bindings.resources[0].texture = batch.texture;
 
