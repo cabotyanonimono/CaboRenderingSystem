@@ -41,6 +41,13 @@ public:
     /// </summary>
     virtual PassTag GetTag() const = 0;
     /// <summary>
+    /// パスの名前です。GPUプロファイラやPIXの区間名に使います。
+    /// </summary>
+    virtual const char *GetName() const
+    {
+        return "Pass";
+    }
+    /// <summary>
     /// マテリアルを使って描画リストを作るかどうかです。
     /// </summary>
     virtual bool UsesDrawList() const

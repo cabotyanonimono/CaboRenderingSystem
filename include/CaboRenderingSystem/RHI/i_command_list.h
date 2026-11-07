@@ -96,5 +96,36 @@ public:
     /// BeginDebugEventで始めた区切りを終えます。
     /// </summary>
     virtual void EndDebugEvent() = 0;
+
+    /// <summary>
+    /// GPU時間と描画数を測る区間を始めます。EndProfileScopeと対にします。入れ子にできます。
+    /// PIXなどのデバッガーにも同じ名前の区切りとして見えます。プロファイラが無効なら区切りだけを記録します。
+    /// </summary>
+    virtual void BeginProfileScope(const char *name) = 0;
+    /// <summary>
+    /// BeginProfileScopeで始めた区間を終えます。
+    /// </summary>
+    virtual void EndProfileScope() = 0;
+};
+
+/// <summary>
+/// コンストラクタでBeginProfileScope、デストラクタでEndProfileScopeを呼ぶ補助です。
+/// </summary>
+class ProfileScope
+{
+    ICommandList &m_command_list_;
+
+public:
+    ProfileScope(ICommandList &command_list, const char *name) : m_command_list_(command_list)
+    {
+        m_command_list_.BeginProfileScope(name);
+    }
+    ~ProfileScope()
+    {
+        m_command_list_.EndProfileScope();
+    }
+
+    ProfileScope(const ProfileScope &) = delete;
+    ProfileScope &operator=(const ProfileScope &) = delete;
 };
 }

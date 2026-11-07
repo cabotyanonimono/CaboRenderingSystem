@@ -225,6 +225,7 @@ void ForwardPipeline::RenderSingleView(const FrameSnapshot &frame, ICommandList 
         if (pass->UsesDrawList())
             draw_list = m_draw_list_builder_.Build(pass->GetTag(), view, visible, frame, materials);
 
+        const ProfileScope pass_scope(command_list, pass->GetName());
         const PassContext context = {
             command_list, m_device_, view, frame, pass->UsesDrawList() ? draw_list : kEmptyDrawList, materials,
             view_constants, lighting, m_white_texture_.GetHandle(), m_default_sampler_.GetHandle()
@@ -236,12 +237,15 @@ void ForwardPipeline::RenderSingleView(const FrameSnapshot &frame, ICommandList 
 void ForwardPipeline::Render(const FrameSnapshot &frame, ICommandList &command_list,
                              const MaterialRegistry &materials)
 {
+    const ProfileScope frame_scope(command_list, "ForwardPipeline");
     m_shadow_system_.BeginFrame();
 
     const auto camera_views = BuildCameraViews(frame);
     for (size_t i = 0; i < camera_views.size(); ++i)
     {
         const auto &camera_view = camera_views[i];
+        const auto camera_name = std::format("Camera {}", i);
+        const ProfileScope camera_scope(command_list, camera_name.c_str());
         const auto target_desc = m_device_.GetTextureDesc(camera_view.color_target);
 
         RenderView scene_view = camera_view;
@@ -265,12 +269,25 @@ void ForwardPipeline::Render(const FrameSnapshot &frame, ICommandList &command_l
 
         std::vector<RenderView> shadow_views;
         const auto lighting = m_shadow_system_.Prepare(frame, scene_view, shadow_views);
-        for (const auto &shadow_view : shadow_views)
-            RenderSingleView(frame, command_list, materials, shadow_view, lighting);
+        if (!shadow_views.empty())
+        {
+            const ProfileScope shadow_scope(command_list, "Shadow Views");
+            for (const auto &shadow_view : shadow_views)
+                RenderSingleView(frame, command_list, materials, shadow_view, lighting);
+        }
 
-        ClearView(command_list, scene_view);
-        RenderSingleView(frame, command_list, materials, scene_view, lighting);
-        RenderSingleView(frame, command_list, materials, composite_view, lighting);
+        {
+            const ProfileScope scene_scope(command_list, "Scene");
+            {
+                const ProfileScope clear_scope(command_list, "Clear");
+                ClearView(command_list, scene_view);
+            }
+            RenderSingleView(frame, command_list, materials, scene_view, lighting);
+        }
+        {
+            const ProfileScope composite_scope(command_list, "Composite");
+            RenderSingleView(frame, command_list, materials, composite_view, lighting);
+        }
 
         if (HasFlag(target_desc.usage, TextureUsage::ShaderResource))
             command_list.Transition(camera_view.color_target, ResourceState::ShaderResource);

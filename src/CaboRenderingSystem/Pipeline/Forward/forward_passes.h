@@ -10,6 +10,10 @@ class ShadowPass final : public IRenderPass
 {
 public:
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Shadow";
+    }
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
 };
@@ -30,6 +34,10 @@ public:
     SkyboxPass(ShaderHandle vertex_shader, ShaderHandle pixel_shader);
 
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Skybox";
+    }
     bool UsesDrawList() const override;
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
@@ -42,6 +50,10 @@ class ForwardPass final : public IRenderPass
 {
 public:
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Forward";
+    }
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
 };
@@ -61,6 +73,10 @@ public:
     LinePass(ShaderHandle vertex_shader, ShaderHandle pixel_shader);
 
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Line";
+    }
     bool UsesDrawList() const override;
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
@@ -82,6 +98,10 @@ public:
     TonemapPass(ShaderHandle vertex_shader, ShaderHandle pixel_shader);
 
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Tonemap";
+    }
     bool UsesDrawList() const override;
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
@@ -103,6 +123,10 @@ public:
     UiPass(ShaderHandle vertex_shader, ShaderHandle pixel_shader);
 
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "UI";
+    }
     bool UsesDrawList() const override;
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;

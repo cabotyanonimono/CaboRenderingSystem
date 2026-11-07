@@ -5,6 +5,7 @@
 
 #include "CaboRenderingSystem/Core/log.h"
 #include "CaboRenderingSystem/RHI/D3D12/d3d12_command_list.h"
+#include "CaboRenderingSystem/RHI/D3D12/d3d12_gpu_profiler.h"
 
 namespace CRS
 {
@@ -169,6 +170,10 @@ bool D3D12RenderDevice::Init(const HWND hwnd, const uint32_t width, const uint32
         return false;
     }
     m_fence_event_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+    m_profiler_ = std::make_unique<D3D12GpuProfiler>();
+    if (!m_profiler_->Init(m_device_.Get(), m_queue_.Get()))
+        m_profiler_.reset();
 
     if (!m_cpu_srv_heap_.Init(m_device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kCpuSrvCapacity) ||
         !m_cpu_rtv_heap_.Init(m_device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kCpuRtvCapacity) ||
@@ -1075,6 +1080,8 @@ void D3D12RenderDevice::Submit(ICommandList &command_list)
         return;
     }
 
+    if (m_profiler_)
+        m_profiler_->EndFrame(m_command_list_->Native());
     m_command_list_->Native()->Close();
     ID3D12CommandList *lists[] = {m_command_list_->Native()};
     m_queue_->ExecuteCommandLists(1, lists);
@@ -1094,6 +1101,8 @@ void D3D12RenderDevice::BeginFrame()
     m_command_list_->InvalidateState();
     m_gpu_srv_ring_.BeginFrame(m_frame_index_);
     m_gpu_sampler_ring_.BeginFrame(m_frame_index_);
+    if (m_profiler_)
+        m_profiler_->BeginFrame(m_frame_index_, m_command_list_->Native());
     m_frame_open_ = true;
 }
 
@@ -1114,6 +1123,8 @@ void D3D12RenderDevice::Present()
     // 次のフレームの準備。そのバッファを前回使ったフレームのGPU処理が終わるまで待つ
     m_frame_index_ = m_swap_chain_->GetCurrentBackBufferIndex();
     WaitForFence(m_frame_fence_values_[m_frame_index_]);
+    if (m_profiler_)
+        m_profiler_->Collect(m_frame_index_);
     RetireFrame(m_frame_index_);
 }
 
@@ -1130,6 +1141,22 @@ Format D3D12RenderDevice::GetBackBufferFormat() const
 uint32_t D3D12RenderDevice::GetFrameIndex() const
 {
     return m_frame_index_;
+}
+
+void D3D12RenderDevice::SetProfilingEnabled(const bool enabled)
+{
+    if (m_profiler_)
+        m_profiler_->SetEnabled(enabled);
+}
+
+bool D3D12RenderDevice::IsProfilingEnabled() const
+{
+    return m_profiler_ && m_profiler_->IsEnabled();
+}
+
+bool D3D12RenderDevice::GetLatestProfile(GpuProfileResult &out_result) const
+{
+    return m_profiler_ && m_profiler_->GetLatest(out_result);
 }
 
 void D3D12RenderDevice::Resize(const uint32_t width, const uint32_t height)

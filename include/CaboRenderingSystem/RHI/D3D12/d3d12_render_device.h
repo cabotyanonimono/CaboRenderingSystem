@@ -15,6 +15,7 @@
 namespace CRS
 {
 class D3D12CommandList;
+class D3D12GpuProfiler;
 
 /// <summary>
 /// 共通ルートシグネチャのパラメーター番号です。定数はルートCBV、t / s はディスクリプタテーブルで渡します。
@@ -185,6 +186,8 @@ private:
     uint64_t m_next_readback_id_ = 1;
     std::unordered_map<uint64_t, PendingReadback> m_readbacks_;
 
+    std::unique_ptr<D3D12GpuProfiler> m_profiler_;
+
     // 定義は .cpp 側（D3D12CommandList が不完全型のヘッダで実体化させないため）
     D3D12RenderDevice();
 
@@ -275,6 +278,10 @@ public:
     uint32_t GetFrameIndex() const override;
     void Resize(uint32_t width, uint32_t height) override;
     void WaitIdle() override;
+
+    void SetProfilingEnabled(bool enabled) override;
+    bool IsProfilingEnabled() const override;
+    bool GetLatestProfile(GpuProfileResult &out_result) const override;
 
     // ---- D3D12固有。RHI/D3D12と、エンジン側のつなぎ（CrsBridge、ImGui）からだけ使います ----
     /// <summary>
