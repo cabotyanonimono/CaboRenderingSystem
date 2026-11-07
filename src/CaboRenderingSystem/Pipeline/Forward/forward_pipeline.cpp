@@ -21,7 +21,6 @@ std::wstring ResolveShaderDirectory(const std::wstring &configured)
         return directory;
     }
 
-    // exeではなく、この関数が入っているモジュール（CaboRenderingSystem.dll）の場所を取る
     HMODULE module = nullptr;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        reinterpret_cast<LPCWSTR>(&ResolveShaderDirectory), &module);
@@ -56,8 +55,9 @@ ForwardPipeline::ForwardPipeline(IRenderDevice &device, const ForwardRenderingSe
     m_line_pixel_shader_ = LoadShader(device, shader_directory, L"line.hlsl", L"PSMain", ShaderStage::Pixel);
     m_ui_vertex_shader_ = LoadShader(device, shader_directory, L"ui.hlsl", L"VSMain", ShaderStage::Vertex);
     m_ui_pixel_shader_ = LoadShader(device, shader_directory, L"ui.hlsl", L"PSMain", ShaderStage::Pixel);
+    m_tonemap_vertex_shader_ = LoadShader(device, shader_directory, L"tonemap.hlsl", L"VSMain", ShaderStage::Vertex);
+    m_tonemap_pixel_shader_ = LoadShader(device, shader_directory, L"tonemap.hlsl", L"PSMain", ShaderStage::Pixel);
 
-    // テクスチャが指定されていないスロット用の1x1の白
     constexpr uint32_t white = 0xFFFFFFFF;
     TextureDesc white_desc;
     white_desc.format = Format::R8G8B8A8_UNorm;
@@ -69,11 +69,11 @@ ForwardPipeline::ForwardPipeline(IRenderDevice &device, const ForwardRenderingSe
 
     m_default_sampler_ = Sampler(device, SamplerDesc{Filter::Linear, AddressMode::Wrap, 8});
 
-    // 登録順 = 実行順
     AddPass(std::make_unique<ShadowPass>());
     AddPass(std::make_unique<SkyboxPass>(m_skybox_vertex_shader_.GetHandle(), m_skybox_pixel_shader_.GetHandle()));
     AddPass(std::make_unique<ForwardPass>());
     AddPass(std::make_unique<LinePass>(m_line_vertex_shader_.GetHandle(), m_line_pixel_shader_.GetHandle()));
+    AddPass(std::make_unique<TonemapPass>(m_tonemap_vertex_shader_.GetHandle(), m_tonemap_pixel_shader_.GetHandle()));
     AddPass(std::make_unique<UiPass>(m_ui_vertex_shader_.GetHandle(), m_ui_pixel_shader_.GetHandle()));
 }
 
@@ -156,6 +156,29 @@ std::vector<RenderView> ForwardPipeline::BuildCameraViews(const FrameSnapshot &f
     return views;
 }
 
+TextureHandle ForwardPipeline::AcquireSceneColor(const size_t index, const TextureDesc &target_desc)
+{
+    if (m_scene_colors_.size() <= index)
+        m_scene_colors_.resize(index + 1);
+
+    auto &scene_color = m_scene_colors_[index];
+    if (scene_color.IsValid())
+    {
+        const auto desc = m_device_.GetTextureDesc(scene_color.GetHandle());
+        if (desc.width == target_desc.width && desc.height == target_desc.height)
+            return scene_color.GetHandle();
+    }
+
+    TextureDesc desc;
+    desc.width = target_desc.width;
+    desc.height = target_desc.height;
+    desc.format = Format::R16G16B16A16_Float;
+    desc.usage = TextureUsage::RenderTarget | TextureUsage::ShaderResource;
+    desc.debug_name = "CRS SceneColor";
+    scene_color = Texture(m_device_, desc);
+    return scene_color.GetHandle();
+}
+
 void ForwardPipeline::ClearView(ICommandList &command_list, const RenderView &view)
 {
     if (view.color_load != LoadOp::Clear && view.depth_load != LoadOp::Clear)
@@ -180,7 +203,9 @@ void ForwardPipeline::RenderSingleView(const FrameSnapshot &frame, ICommandList 
                                        const MaterialRegistry &materials, const RenderView &view,
                                        const FrameLighting &lighting)
 {
-    const auto visible = m_culling_stage_.Cull(view, frame.meshes);
+    const auto visible = view.kind == RenderViewKind::Composite
+                             ? std::vector<uint32_t>{}
+                             : m_culling_stage_.Cull(view, frame.meshes);
 
     ViewConstants view_constants;
     view_constants.view = view.view;
@@ -200,6 +225,7 @@ void ForwardPipeline::RenderSingleView(const FrameSnapshot &frame, ICommandList 
         if (pass->UsesDrawList())
             draw_list = m_draw_list_builder_.Build(pass->GetTag(), view, visible, frame, materials);
 
+        const ProfileScope pass_scope(command_list, pass->GetName());
         const PassContext context = {
             command_list, m_device_, view, frame, pass->UsesDrawList() ? draw_list : kEmptyDrawList, materials,
             view_constants, lighting, m_white_texture_.GetHandle(), m_default_sampler_.GetHandle()
@@ -211,21 +237,59 @@ void ForwardPipeline::RenderSingleView(const FrameSnapshot &frame, ICommandList 
 void ForwardPipeline::Render(const FrameSnapshot &frame, ICommandList &command_list,
                              const MaterialRegistry &materials)
 {
+    const ProfileScope frame_scope(command_list, "ForwardPipeline");
     m_shadow_system_.BeginFrame();
 
-    for (const auto &camera_view : BuildCameraViews(frame))
+    const auto camera_views = BuildCameraViews(frame);
+    for (size_t i = 0; i < camera_views.size(); ++i)
     {
-        // 影由来のビューも、カメラと同じ経路（カリング → 描画リスト → パス）で処理する
+        const auto &camera_view = camera_views[i];
+        const auto camera_name = std::format("Camera {}", i);
+        const ProfileScope camera_scope(command_list, camera_name.c_str());
+        const auto target_desc = m_device_.GetTextureDesc(camera_view.color_target);
+
+        RenderView scene_view = camera_view;
+        RenderView composite_view = camera_view;
+        composite_view.kind = RenderViewKind::Composite;
+        composite_view.depth_target = {};
+        composite_view.depth_format = Format::Unknown;
+        composite_view.color_load = LoadOp::Load;
+
+        if (camera_view.sample_count == 1)
+        {
+            const auto scene_color = AcquireSceneColor(i, target_desc);
+            scene_view.color_target = scene_color;
+            scene_view.color_format = Format::R16G16B16A16_Float;
+            if (camera_view.color_load == LoadOp::Load)
+                scene_view.clear_color = {0, 0, 0, 0};
+            scene_view.color_load = LoadOp::Clear;
+            composite_view.scene_color = scene_color;
+            composite_view.color_load = camera_view.color_load;
+        }
+
         std::vector<RenderView> shadow_views;
-        const auto lighting = m_shadow_system_.Prepare(frame, camera_view, shadow_views);
-        for (const auto &shadow_view : shadow_views)
-            RenderSingleView(frame, command_list, materials, shadow_view, lighting);
+        const auto lighting = m_shadow_system_.Prepare(frame, scene_view, shadow_views);
+        if (!shadow_views.empty())
+        {
+            const ProfileScope shadow_scope(command_list, "Shadow Views");
+            for (const auto &shadow_view : shadow_views)
+                RenderSingleView(frame, command_list, materials, shadow_view, lighting);
+        }
 
-        ClearView(command_list, camera_view);
-        RenderSingleView(frame, command_list, materials, camera_view, lighting);
+        {
+            const ProfileScope scene_scope(command_list, "Scene");
+            {
+                const ProfileScope clear_scope(command_list, "Clear");
+                ClearView(command_list, scene_view);
+            }
+            RenderSingleView(frame, command_list, materials, scene_view, lighting);
+        }
+        {
+            const ProfileScope composite_scope(command_list, "Composite");
+            RenderSingleView(frame, command_list, materials, composite_view, lighting);
+        }
 
-        // テクスチャとして読む描画先（RenderTexture）は、後のカメラが読めるようにしておく
-        if (HasFlag(m_device_.GetTextureDesc(camera_view.color_target).usage, TextureUsage::ShaderResource))
+        if (HasFlag(target_desc.usage, TextureUsage::ShaderResource))
             command_list.Transition(camera_view.color_target, ResourceState::ShaderResource);
     }
 }

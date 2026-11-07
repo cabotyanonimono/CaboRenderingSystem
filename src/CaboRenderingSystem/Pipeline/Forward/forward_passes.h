@@ -9,8 +9,11 @@ namespace CRS
 class ShadowPass final : public IRenderPass
 {
 public:
-    // ---- IRenderPassの実装（説明はIRenderPassを参照） ----
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Shadow";
+    }
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
 };
@@ -30,8 +33,11 @@ public:
     /// </summary>
     SkyboxPass(ShaderHandle vertex_shader, ShaderHandle pixel_shader);
 
-    // ---- IRenderPassの実装（説明はIRenderPassを参照） ----
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Skybox";
+    }
     bool UsesDrawList() const override;
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
@@ -43,8 +49,11 @@ public:
 class ForwardPass final : public IRenderPass
 {
 public:
-    // ---- IRenderPassの実装（説明はIRenderPassを参照） ----
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Forward";
+    }
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
 };
@@ -63,15 +72,43 @@ public:
     /// </summary>
     LinePass(ShaderHandle vertex_shader, ShaderHandle pixel_shader);
 
-    // ---- IRenderPassの実装（説明はIRenderPassを参照） ----
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Line";
+    }
     bool UsesDrawList() const override;
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;
 };
 
 /// <summary>
-/// UI（画像、テキスト）を画面の一番手前に描くパスです。draw_overlaysがtrueのカメラだけを描きます。
+/// シーンカラー（HDR）をトーンマップして、カメラの描画先に書き出すパスです。Compositeのビューだけを描きます。
+/// カメラの描画先をLoadで重ねる場合は、シーンカラーのアルファで合成します。
+/// </summary>
+class TonemapPass final : public IRenderPass
+{
+    ShaderHandle m_vertex_shader_;
+    ShaderHandle m_pixel_shader_;
+
+public:
+    /// <summary>
+    /// 使うシェーダーを受け取ります。シェーダーはForwardPipelineが持ち、このパスより長く生きます。
+    /// </summary>
+    TonemapPass(ShaderHandle vertex_shader, ShaderHandle pixel_shader);
+
+    PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "Tonemap";
+    }
+    bool UsesDrawList() const override;
+    bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
+    void Execute(const PassContext &context) override;
+};
+
+/// <summary>
+/// UI（画像、テキスト）を画面の一番手前に描くパスです。draw_overlaysがtrueのCompositeのビューだけを描きます。
 /// バッチにUI用のShaderのMaterialがあればそのShaderで、なければ標準のShaderで描きます。
 /// </summary>
 class UiPass final : public IRenderPass
@@ -85,8 +122,11 @@ public:
     /// </summary>
     UiPass(ShaderHandle vertex_shader, ShaderHandle pixel_shader);
 
-    // ---- IRenderPassの実装（説明はIRenderPassを参照） ----
     PassTag GetTag() const override;
+    const char *GetName() const override
+    {
+        return "UI";
+    }
     bool UsesDrawList() const override;
     bool AcceptsView(const RenderView &view, const FrameSnapshot &frame) const override;
     void Execute(const PassContext &context) override;

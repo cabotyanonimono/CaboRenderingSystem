@@ -13,14 +13,15 @@ namespace CRS
 {
 /// <summary>
 /// Forwardパイプライン用のカメラ設定です。
+/// sample_countはMSAAのサンプル数で、描画先のテクスチャも同じサンプル数で作る必要があります。
+/// exposureはトーンマップの前にシーンの色へ掛ける露出です。
 /// </summary>
 class ForwardCameraSettings final : public ICameraSettings
 {
 public:
-    // MSAAのサンプル数（描画先のテクスチャも同じサンプル数で作る必要があります）
     uint32_t sample_count = 1;
-    // 予約（深度プリパスはまだありません）
     bool depth_prepass = false;
+    float exposure = 1.0f;
 
     std::unique_ptr<ICameraSettings> Clone() const override
     {
@@ -30,24 +31,22 @@ public:
 
 /// <summary>
 /// シーン全体で1つのパイプライン設定です。
+/// shader_directoryが空なら、CaboRenderingSystem.dll と同じフォルダの Shaders/ を使います。
 /// </summary>
 struct ForwardRenderingSettings
 {
-    // シャドウマップ1枚の一辺のピクセル数
     uint32_t shadow_map_size = 2048;
-    // シャドウマップの最大枚数（平行光源は3枚、スポットライトは1枚使う）
     uint32_t max_shadow_maps = 10;
-    // 組み込みシェーダー（.hlsl）を読むフォルダ。空なら CaboRenderingSystem.dll と同じフォルダの Shaders/ を使う
     std::wstring shader_directory;
 };
 
 /// <summary>
 /// Forwardパイプラインです。カメラごとに、影のビューを描いてから、登録されたパスを登録順で実行します。
+/// シーンはHDRのシーンカラーに描き、Compositeのビューでトーンマップしてカメラの描画先に書き出します。
 /// </summary>
 class CRS_API ForwardPipeline final : public IRenderPipeline
 {
 public:
-    // DLLから公開するクラスはコピー関数も実体化されるので、コピーできないことを明示する
     ForwardPipeline(const ForwardPipeline &) = delete;
     ForwardPipeline &operator=(const ForwardPipeline &) = delete;
 
@@ -59,7 +58,6 @@ private:
     DrawListBuilder m_draw_list_builder_;
     ShadowSystem m_shadow_system_;
 
-    // 組み込みのシェーダー（Shaders/）。標準のマテリアル、標準の影、スカイボックス、線、UIに使う
     Shader m_standard_vertex_shader_;
     Shader m_standard_pixel_shader_;
     Shader m_shadow_vertex_shader_;
@@ -69,13 +67,18 @@ private:
     Shader m_line_pixel_shader_;
     Shader m_ui_vertex_shader_;
     Shader m_ui_pixel_shader_;
-    // マテリアルがテクスチャを設定していないスロットに入れる1x1の白
+    Shader m_tonemap_vertex_shader_;
+    Shader m_tonemap_pixel_shader_;
     Texture m_white_texture_;
-    // マテリアルがサンプラーを設定していないスロットに入れる（Linear / Wrap）
     Sampler m_default_sampler_;
+    std::vector<Texture> m_scene_colors_;
 
     // スナップショットのカメラを、priorityの小さい順にRenderViewへ変換する
     std::vector<RenderView> BuildCameraViews(const FrameSnapshot &frame) const;
+    /// <summary>
+    /// index番目のカメラが使うHDRのシーンカラーを、描画先と同じ大きさで用意します。大きさが変わったら作り直します。
+    /// </summary>
+    TextureHandle AcquireSceneColor(size_t index, const TextureDesc &target_desc);
     /// <summary>
     /// カメラの描画先を、ビューの設定でクリアします。以降のパスは上に重ねて描きます。
     /// </summary>
@@ -86,11 +89,10 @@ private:
 
 public:
     /// <summary>
-    /// 組み込みのシェーダーをコンパイルし、影のテクスチャなどを作って、標準のパス（Shadow → Skybox → Forward → Line → UI）を登録します。
+    /// 組み込みのシェーダーをコンパイルし、影のテクスチャなどを作って、標準のパス（Shadow → Skybox → Forward → Line → Tonemap → UI）を登録します。
     /// </summary>
     ForwardPipeline(IRenderDevice &device, const ForwardRenderingSettings &settings = {});
 
-    // ---- IRenderPipelineの実装（説明はIRenderPipelineを参照） ----
     std::unique_ptr<ICameraSettings> CreateCameraSettings() const override;
     /// <summary>
     /// 組み込みのforward_standard.hlslを使い、Forwardパス（ライティングあり）とShadowパスを持つマテリアルを作ります。

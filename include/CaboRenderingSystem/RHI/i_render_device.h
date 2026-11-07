@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <vector>
 
+#include "CaboRenderingSystem/RHI/gpu_profile.h"
 #include "CaboRenderingSystem/RHI/i_command_list.h"
 #include "CaboRenderingSystem/RHI/rhi_types.h"
 #include "CaboRenderingSystem/RHI/shader_reflection.h"
@@ -127,5 +128,19 @@ public:
     /// GPUの処理がすべて終わるまで待ちます（終了時や作り直しの前に使います）。
     /// </summary>
     virtual void WaitIdle() = 0;
+
+    // ---- GPUプロファイラ ----
+    /// <summary>
+    /// GPUプロファイラを有効 / 無効にします。次のBeginFrameから反映します。
+    /// </summary>
+    virtual void SetProfilingEnabled(bool enabled) = 0;
+    /// <summary>
+    /// GPUプロファイラが有効かどうかです。
+    /// </summary>
+    virtual bool IsProfilingEnabled() const = 0;
+    /// <summary>
+    /// 読み戻しが終わった最新のフレームのプロファイルをout_resultに入れます。まだ結果がなければfalseを返します。
+    /// </summary>
+    virtual bool GetLatestProfile(GpuProfileResult &out_result) const = 0;
 };
 }

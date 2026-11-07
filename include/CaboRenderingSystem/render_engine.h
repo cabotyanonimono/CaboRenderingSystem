@@ -165,6 +165,22 @@ public:
     /// </summary>
     void Resize(uint32_t width, uint32_t height);
 
+    /// <summary>
+    /// GPUプロファイラを有効 / 無効にします。有効にすると、パスごとのGPU時間と描画数を測ります。
+    /// </summary>
+    void SetGpuProfilingEnabled(const bool enabled)
+    {
+        m_device_->SetProfilingEnabled(enabled);
+    }
+
+    /// <summary>
+    /// 読み戻しが終わった最新のGPUプロファイルを取得します（数フレーム前の結果）。まだなければfalseを返します。
+    /// </summary>
+    bool GetGpuProfile(GpuProfileResult &out_result) const
+    {
+        return m_device_->GetLatestProfile(out_result);
+    }
+
     // ---- 1フレームの流れ ----
     // BeginFrame → Render → EndFrame の順に呼びます。RenderFrameはそれをまとめて行います
     /// <summary>

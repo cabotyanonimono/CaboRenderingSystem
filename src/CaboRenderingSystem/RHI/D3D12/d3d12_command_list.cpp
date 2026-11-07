@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "CaboRenderingSystem/Core/log.h"
+#include "CaboRenderingSystem/RHI/D3D12/d3d12_gpu_profiler.h"
 #include "CaboRenderingSystem/RHI/D3D12/d3d12_render_device.h"
 
 namespace CRS
@@ -259,6 +260,8 @@ void D3D12CommandList::Draw(const uint32_t vertex_count, const uint32_t instance
                             const uint32_t first_instance)
 {
     m_list_->DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
+    if (m_device_.m_profiler_)
+        m_device_.m_profiler_->CountDraw(static_cast<uint64_t>(vertex_count) * instance_count, 0);
 }
 
 void D3D12CommandList::DrawIndexed(const uint32_t index_count, const uint32_t instance_count,
@@ -266,6 +269,8 @@ void D3D12CommandList::DrawIndexed(const uint32_t index_count, const uint32_t in
                                    const uint32_t first_instance)
 {
     m_list_->DrawIndexedInstanced(index_count, instance_count, first_index, base_vertex, first_instance);
+    if (m_device_.m_profiler_)
+        m_device_.m_profiler_->CountDraw(0, static_cast<uint64_t>(index_count) * instance_count);
 }
 
 void D3D12CommandList::CopyBuffer(const BufferHandle dst, const uint64_t dst_offset, const BufferHandle src,
@@ -299,5 +304,19 @@ void D3D12CommandList::BeginDebugEvent(const char *name)
 void D3D12CommandList::EndDebugEvent()
 {
     m_list_->EndEvent();
+}
+
+void D3D12CommandList::BeginProfileScope(const char *name)
+{
+    BeginDebugEvent(name);
+    if (m_device_.m_profiler_)
+        m_device_.m_profiler_->BeginScope(m_list_.Get(), name);
+}
+
+void D3D12CommandList::EndProfileScope()
+{
+    if (m_device_.m_profiler_)
+        m_device_.m_profiler_->EndScope(m_list_.Get());
+    EndDebugEvent();
 }
 }

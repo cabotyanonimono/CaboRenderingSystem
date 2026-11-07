@@ -6,7 +6,9 @@
 #include <windows.h>
 
 #include <chrono>
+#include <format>
 #include <memory>
+#include <string>
 
 #include <CaboRenderingSystem/render_engine.h>
 
@@ -18,6 +20,27 @@ constexpr uint32_t kWidth = 1280;
 constexpr uint32_t kHeight = 720;
 
 std::unique_ptr<RenderEngine> g_engine;
+
+// GPUプロファイルをデバッグ出力に書き、フレームのGPU時間をウィンドウタイトルに出す
+void ReportGpuProfile(const HWND hwnd)
+{
+    GpuProfileResult profile;
+    if (!g_engine->GetGpuProfile(profile))
+        return;
+
+    std::string report = std::format("---- GPU frame {} : {:.3f} ms, {} draws ----\n", profile.frame_number,
+                                     profile.frame_gpu_ms, profile.draw_calls);
+    for (const auto &scope : profile.scopes)
+    {
+        report += std::format("{:{}}{:<20} {:8.3f} ms  draws {:5}  verts {:8}  indices {:8}\n", "", scope.depth * 2,
+                              scope.name, scope.gpu_ms, scope.draw_calls, scope.vertices, scope.indices);
+    }
+    OutputDebugStringA(report.c_str());
+
+    const auto title = std::format(L"CaboRenderingSystem Sample - GPU {:.3f} ms / {} draws", profile.frame_gpu_ms,
+                                   profile.draw_calls);
+    SetWindowTextW(hwnd, title.c_str());
+}
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
@@ -89,9 +112,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
     }
     ShowWindow(hwnd, show);
 
+    g_engine->SetGpuProfilingEnabled(true);
+
     const CameraId camera = g_engine->CreateCamera();
     const auto start = std::chrono::steady_clock::now();
     auto previous = start;
+    auto last_report = start;
 
     MSG msg = {};
     while (msg.message != WM_QUIT)
@@ -133,6 +159,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
         DrawCube(immediate, world, Color(1.f, 0.6f, 0.1f, 1.f));
 
         g_engine->RenderFrame(time, delta);
+
+        if (now - last_report >= std::chrono::seconds(1))
+        {
+            ReportGpuProfile(hwnd);
+            last_report = now;
+        }
     }
 
     g_engine->DestroyCamera(camera);

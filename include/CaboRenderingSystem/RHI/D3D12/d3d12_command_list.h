@@ -81,5 +81,8 @@ public:
 
     void BeginDebugEvent(const char *name) override;
     void EndDebugEvent() override;
+
+    void BeginProfileScope(const char *name) override;
+    void EndProfileScope() override;
 };
 }
