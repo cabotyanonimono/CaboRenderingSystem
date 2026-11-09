@@ -82,6 +82,27 @@ public:
                              int32_t base_vertex = 0, uint32_t first_instance = 0) = 0;
 
     /// <summary>
+    /// コンピュートシェーダーのPSOを設定します（CreateComputePipelineStateで作ったもの）。
+    /// </summary>
+    virtual void SetComputePipelineState(PipelineStateHandle pipeline_state) = 0;
+    /// <summary>
+    /// コンピュートシェーダーに定数・リソース・UAV・サンプラーをまとめて設定します。形はSetBindingsと同じです。
+    /// </summary>
+    virtual void SetComputeBindings(const Bindings &bindings) = 0;
+    /// <summary>
+    /// コンピュートシェーダーを実行します。引数はスレッドグループの数です。
+    /// </summary>
+    virtual void Dispatch(uint32_t group_count_x, uint32_t group_count_y = 1, uint32_t group_count_z = 1) = 0;
+    /// <summary>
+    /// 前のDispatchの書き込みが終わってから次の読み書きをするよう待ちます（同じUAVを続けて使う場合）。
+    /// </summary>
+    virtual void UavBarrier(BufferHandle buffer) = 0;
+    /// <summary>
+    /// 前のDispatchの書き込みが終わってから次の読み書きをするよう待ちます（同じUAVを続けて使う場合）。
+    /// </summary>
+    virtual void UavBarrier(TextureHandle texture) = 0;
+
+    /// <summary>
     /// GPU上でバッファの一部をコピーします。状態の切り替え（CopyDest / CopySource）は呼び出し側で先に行います。
     /// コピー先はGpuOnlyのバッファだけです。コピー元がUploadなら今のフレームのコピーを使います。
     /// </summary>

@@ -26,8 +26,10 @@ private:
     PrimitiveTopology m_current_topology_ = PrimitiveTopology::TriangleList;
     bool m_root_state_bound_ = false;
 
-    // ディスクリプタヒープと共通ルートシグネチャを、まだなら設定する
+    // ディスクリプタヒープと共通ルートシグネチャ（グラフィックス / コンピュートの両方）を、まだなら設定する
     void BindRootState();
+    // Bindingsをルートパラメーターに設定する。computeならSetComputeRoot*を使う
+    void BindParameters(const Bindings &bindings, bool compute);
 
 public:
     void *GetNativeCommandList() const override
@@ -66,6 +68,12 @@ public:
 
     void SetPipelineState(PipelineStateHandle pipeline_state) override;
     void SetBindings(const Bindings &bindings) override;
+
+    void SetComputePipelineState(PipelineStateHandle pipeline_state) override;
+    void SetComputeBindings(const Bindings &bindings) override;
+    void Dispatch(uint32_t group_count_x, uint32_t group_count_y = 1, uint32_t group_count_z = 1) override;
+    void UavBarrier(BufferHandle buffer) override;
+    void UavBarrier(TextureHandle texture) override;
 
     void SetVertexBuffer(BufferHandle buffer, uint32_t stride, uint64_t offset = 0) override;
     void SetVertexData(const TransientVertices &vertices) override;

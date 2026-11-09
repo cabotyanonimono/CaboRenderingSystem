@@ -27,6 +27,7 @@ void D3D12CommandList::BindRootState()
     ID3D12DescriptorHeap *heaps[] = {m_device_.m_gpu_srv_ring_.Heap(), m_device_.m_gpu_sampler_ring_.Heap()};
     m_list_->SetDescriptorHeaps(2, heaps);
     m_list_->SetGraphicsRootSignature(m_device_.m_root_signature_.Get());
+    m_list_->SetComputeRootSignature(m_device_.m_root_signature_.Get());
     m_root_state_bound_ = true;
 }
 
@@ -133,14 +134,93 @@ void D3D12CommandList::SetPipelineState(const PipelineStateHandle pipeline_state
         return;
     }
 
+    if (pipeline_state->is_compute)
+    {
+        LogError("SetPipelineState: compute pipeline state. Use SetComputePipelineState");
+        return;
+    }
+
     m_list_->SetPipelineState(pipeline_state->pipeline_state.Get());
     m_list_->IASetPrimitiveTopology(ToD3D12Topology(pipeline_state->desc.topology));
     m_current_pipeline_state_ = pipeline_state_handle;
 }
 
+void D3D12CommandList::SetComputePipelineState(const PipelineStateHandle pipeline_state_handle)
+{
+    BindRootState();
+
+    if (m_current_pipeline_state_ == pipeline_state_handle)
+        return;
+
+    const auto pipeline_state = m_device_.m_pipeline_states_.Get(pipeline_state_handle);
+    if (pipeline_state == nullptr || !pipeline_state->is_compute)
+    {
+        LogError("SetComputePipelineState: invalid compute pipeline state handle");
+        return;
+    }
+
+    m_list_->SetPipelineState(pipeline_state->pipeline_state.Get());
+    m_current_pipeline_state_ = pipeline_state_handle;
+}
+
+void D3D12CommandList::Dispatch(const uint32_t group_count_x, const uint32_t group_count_y,
+                                const uint32_t group_count_z)
+{
+    m_list_->Dispatch(group_count_x, group_count_y, group_count_z);
+}
+
+void D3D12CommandList::UavBarrier(const BufferHandle buffer_handle)
+{
+    const auto buffer = m_device_.m_buffers_.Get(buffer_handle);
+    if (buffer == nullptr)
+    {
+        LogError("UavBarrier: invalid buffer handle");
+        return;
+    }
+
+    const auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(buffer->resources[0].Get());
+    m_list_->ResourceBarrier(1, &barrier);
+}
+
+void D3D12CommandList::UavBarrier(const TextureHandle texture_handle)
+{
+    const auto texture = m_device_.m_textures_.Get(texture_handle);
+    if (texture == nullptr)
+    {
+        LogError("UavBarrier: invalid texture handle");
+        return;
+    }
+
+    const auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(texture->resource.Get());
+    m_list_->ResourceBarrier(1, &barrier);
+}
+
 void D3D12CommandList::SetBindings(const Bindings &bindings)
 {
     BindRootState();
+    BindParameters(bindings, false);
+}
+
+void D3D12CommandList::SetComputeBindings(const Bindings &bindings)
+{
+    BindRootState();
+    BindParameters(bindings, true);
+}
+
+void D3D12CommandList::BindParameters(const Bindings &bindings, const bool compute)
+{
+    const auto set_cbv = [&](const uint32_t parameter, const D3D12_GPU_VIRTUAL_ADDRESS address) {
+        if (compute)
+            m_list_->SetComputeRootConstantBufferView(parameter, address);
+        else
+            m_list_->SetGraphicsRootConstantBufferView(parameter, address);
+    };
+    const auto set_table = [&](const uint32_t parameter, const D3D12_GPU_DESCRIPTOR_HANDLE handle) {
+        if (compute)
+            m_list_->SetComputeRootDescriptorTable(parameter, handle);
+        else
+            m_list_->SetGraphicsRootDescriptorTable(parameter, handle);
+    };
 
     // 定数: CPUの値はアップロード用のリングにコピーし、GPUバッファはそのアドレスを使う
     // 何も渡されていない場合も、シェーダーが読む可能性があるので0で埋めた領域を渡す（1回の呼び出しの中で共有）
@@ -167,7 +247,7 @@ void D3D12CommandList::SetBindings(const Bindings &bindings)
         }
 
         if (address != 0)
-            m_list_->SetGraphicsRootConstantBufferView(parameter, address);
+            set_cbv(parameter, address);
     };
     for (uint32_t slot = 0; slot < kConstantSlotCount; ++slot)
         bind_constant(bindings.constants[slot], kRootParameter_Constants + slot);
@@ -186,10 +266,22 @@ void D3D12CommandList::SetBindings(const Bindings &bindings)
             native_device->CopyDescriptorsSimple(1, range.Cpu(slot), m_device_.GetResourceSrv(resources[slot]),
                                                  D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         }
-        m_list_->SetGraphicsRootDescriptorTable(parameter, range.gpu);
+        set_table(parameter, range.gpu);
     };
     bind_table(bindings.resources.data(), kResourceSlotCount, kRootParameter_Resources);
     bind_table(bindings.frame_resources.data(), kFrameResourceSlotCount, kRootParameter_FrameResources);
+
+    GpuDescriptorRange uav_range;
+    if (m_device_.m_gpu_srv_ring_.Allocate(kUnorderedAccessSlotCount, uav_range))
+    {
+        for (uint32_t slot = 0; slot < kUnorderedAccessSlotCount; ++slot)
+        {
+            native_device->CopyDescriptorsSimple(1, uav_range.Cpu(slot),
+                                                 m_device_.GetResourceUav(bindings.unordered_access[slot]),
+                                                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        }
+        set_table(kRootParameter_UnorderedAccess, uav_range.gpu);
+    }
 
     // s0..s3
     GpuDescriptorRange sampler_range;
@@ -201,7 +293,7 @@ void D3D12CommandList::SetBindings(const Bindings &bindings)
                                                  m_device_.GetSamplerDescriptor(bindings.samplers[slot]),
                                                  D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
         }
-        m_list_->SetGraphicsRootDescriptorTable(kRootParameter_Samplers, sampler_range.gpu);
+        set_table(kRootParameter_Samplers, sampler_range.gpu);
     }
 }
 

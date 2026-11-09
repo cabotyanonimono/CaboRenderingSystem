@@ -87,7 +87,19 @@ bool D3D12ShaderCompiler::Compile(const ShaderSource &source, std::vector<uint8_
         return false;
     }
 
-    const wchar_t *target = source.stage == ShaderStage::Vertex ? L"vs_6_0" : L"ps_6_0";
+    const wchar_t *target = L"vs_6_0";
+    switch (source.stage)
+    {
+    case ShaderStage::Pixel:
+        target = L"ps_6_0";
+        break;
+    case ShaderStage::Compute:
+        target = L"cs_6_0";
+        break;
+    case ShaderStage::Vertex:
+    default:
+        break;
+    }
 
     std::vector<std::wstring> define_args;
     for (const auto &define : source.defines)

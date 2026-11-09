@@ -92,8 +92,10 @@ bool D3D12RenderDevice::Init(const HWND hwnd, const uint32_t width, const uint32
     {
         DWORD cookie = 0;
         info_queue->RegisterMessageCallback(
-            [](D3D12_MESSAGE_CATEGORY, const D3D12_MESSAGE_SEVERITY severity, D3D12_MESSAGE_ID,
+            [](D3D12_MESSAGE_CATEGORY, const D3D12_MESSAGE_SEVERITY severity, const D3D12_MESSAGE_ID id,
                const LPCSTR description, void *) {
+                if (id == D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE)
+                    return;
                 if (severity <= D3D12_MESSAGE_SEVERITY_ERROR)
                     LogError("D3D12: {}", description);
                 else if (severity == D3D12_MESSAGE_SEVERITY_WARNING)
@@ -196,6 +198,12 @@ bool D3D12RenderDevice::Init(const HWND hwnd, const uint32_t width, const uint32
     null_srv_desc.Texture2D.MipLevels = 1;
     m_device_->CreateShaderResourceView(nullptr, &null_srv_desc, m_null_srv_.handle);
 
+    m_null_uav_ = m_cpu_srv_heap_.Allocate();
+    D3D12_UNORDERED_ACCESS_VIEW_DESC null_uav_desc = {};
+    null_uav_desc.Format = DXGI_FORMAT_R32_UINT;
+    null_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+    m_device_->CreateUnorderedAccessView(nullptr, nullptr, &null_uav_desc, m_null_uav_.handle);
+
     m_default_sampler_ = m_cpu_sampler_heap_.Allocate();
     D3D12_SAMPLER_DESC default_sampler_desc = {};
     default_sampler_desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -229,6 +237,8 @@ bool D3D12RenderDevice::CreateRootSignature()
     frame_resource_range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, kFrameResourceSlotCount, 0, 1);
     CD3DX12_DESCRIPTOR_RANGE sampler_range;
     sampler_range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, kSamplerSlotCount, 0, 0);
+    CD3DX12_DESCRIPTOR_RANGE uav_range;
+    uav_range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, kUnorderedAccessSlotCount, 0, 0);
 
     std::array<CD3DX12_ROOT_PARAMETER, kRootParameter_Count> parameters;
     for (uint32_t slot = 0; slot < kConstantSlotCount; ++slot)
@@ -238,6 +248,7 @@ bool D3D12RenderDevice::CreateRootSignature()
     parameters[kRootParameter_Resources].InitAsDescriptorTable(1, &resource_range);
     parameters[kRootParameter_FrameResources].InitAsDescriptorTable(1, &frame_resource_range);
     parameters[kRootParameter_Samplers].InitAsDescriptorTable(1, &sampler_range);
+    parameters[kRootParameter_UnorderedAccess].InitAsDescriptorTable(1, &uav_range);
 
     // space1の固定サンプラー。s0: 影の比較用, s1: 線形Clamp
     std::array<CD3DX12_STATIC_SAMPLER_DESC, 2> static_samplers;
@@ -388,6 +399,23 @@ void D3D12RenderDevice::CreateTextureViews(D3D12Texture &texture)
         m_device_->CreateShaderResourceView(texture.resource.Get(), &srv_desc, texture.srv.handle);
     }
 
+    if (HasFlag(desc.usage, TextureUsage::UnorderedAccess))
+    {
+        texture.uav = m_cpu_srv_heap_.Allocate();
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {};
+        uav_desc.Format = format;
+        if (desc.dimension == TextureDimension::Texture2D)
+        {
+            uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        }
+        else
+        {
+            uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+            uav_desc.Texture2DArray.ArraySize = desc.array_size;
+        }
+        m_device_->CreateUnorderedAccessView(texture.resource.Get(), nullptr, &uav_desc, texture.uav.handle);
+    }
+
     if (HasFlag(desc.usage, TextureUsage::RenderTarget))
     {
         texture.rtv = m_cpu_rtv_heap_.Allocate();
@@ -496,11 +524,24 @@ void D3D12RenderDevice::CreateBufferViews(D3D12Buffer &buffer)
         buffer.srv[i] = m_cpu_srv_heap_.Allocate();
         m_device_->CreateShaderResourceView(buffer.resources[i].Get(), &srv_desc, buffer.srv[i].handle);
     }
+
+    if (HasFlag(buffer.desc.usage, BufferUsage::ReadWrite) && buffer.desc.memory == MemoryType::GpuOnly)
+    {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {};
+        uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        uav_desc.Format = srv_desc.Format;
+        uav_desc.Buffer.NumElements = srv_desc.Buffer.NumElements;
+        uav_desc.Buffer.StructureByteStride = srv_desc.Buffer.StructureByteStride;
+        uav_desc.Buffer.Flags = raw ? D3D12_BUFFER_UAV_FLAG_RAW : D3D12_BUFFER_UAV_FLAG_NONE;
+        buffer.uav = m_cpu_srv_heap_.Allocate();
+        m_device_->CreateUnorderedAccessView(buffer.resources[0].Get(), nullptr, &uav_desc, buffer.uav.handle);
+    }
 }
 
 void D3D12RenderDevice::ReleaseTextureViews(D3D12Texture &texture)
 {
     m_cpu_srv_heap_.Free(texture.srv);
+    m_cpu_srv_heap_.Free(texture.uav);
     m_cpu_rtv_heap_.Free(texture.rtv);
     m_cpu_dsv_heap_.Free(texture.dsv);
     for (auto &descriptor : texture.dsv_slices)
@@ -563,6 +604,19 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3D12RenderDevice::GetResourceSrv(const ResourceBind
     }
 
     return m_null_srv_.handle;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12RenderDevice::GetResourceUav(const UnorderedAccessBinding &binding)
+{
+    if (const auto texture = m_textures_.Get(binding.texture);
+        texture != nullptr && texture->uav.IsValid())
+        return texture->uav.handle;
+
+    if (const auto buffer = m_buffers_.Get(binding.buffer);
+        buffer != nullptr && buffer->uav.IsValid())
+        return buffer->uav.handle;
+
+    return m_null_uav_.handle;
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE D3D12RenderDevice::GetSamplerDescriptor(const SamplerHandle sampler_handle)
@@ -695,6 +749,16 @@ TextureHandle D3D12RenderDevice::CreateTexture(const TextureDesc &desc)
     D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
     if (HasFlag(desc.usage, TextureUsage::RenderTarget))
         flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    if (HasFlag(desc.usage, TextureUsage::UnorderedAccess))
+    {
+        if (desc.sample_count > 1 || IsBlockCompressed(desc.format) || desc.format == Format::D32_Float ||
+            HasFlag(desc.usage, TextureUsage::DepthStencil))
+        {
+            LogError("CreateTexture: UnorderedAccess is not supported for this format / usage ({})", desc.debug_name);
+            return {};
+        }
+        flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    }
     if (HasFlag(desc.usage, TextureUsage::DepthStencil))
     {
         flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
@@ -807,7 +871,7 @@ PipelineStateHandle D3D12RenderDevice::CreatePipelineState(const PipelineStateDe
     for (auto itr = begin; itr != end; ++itr)
     {
         if (const auto cached = m_pipeline_states_.Get(itr->second);
-            cached != nullptr && cached->desc == desc)
+            cached != nullptr && !cached->is_compute && cached->desc == desc)
             return itr->second;
     }
 
@@ -867,6 +931,42 @@ PipelineStateHandle D3D12RenderDevice::CreatePipelineState(const PipelineStateDe
     return handle;
 }
 
+PipelineStateHandle D3D12RenderDevice::CreateComputePipelineState(const ComputePipelineStateDesc &desc)
+{
+    const auto hash = desc.Hash();
+    const auto [begin, end] = m_pipeline_state_cache_.equal_range(hash);
+    for (auto itr = begin; itr != end; ++itr)
+    {
+        if (const auto cached = m_pipeline_states_.Get(itr->second);
+            cached != nullptr && cached->is_compute && cached->compute_desc == desc)
+            return itr->second;
+    }
+
+    const auto compute_shader = m_shaders_.Get(desc.compute_shader);
+    if (compute_shader == nullptr)
+    {
+        LogError("CreateComputePipelineState: invalid compute shader");
+        return {};
+    }
+
+    D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc = {};
+    pso_desc.pRootSignature = m_root_signature_.Get();
+    pso_desc.CS = {compute_shader->bytecode.data(), compute_shader->bytecode.size()};
+
+    D3D12PipelineState pipeline_state;
+    pipeline_state.compute_desc = desc;
+    pipeline_state.is_compute = true;
+    if (FAILED(m_device_->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&pipeline_state.pipeline_state))))
+    {
+        LogError("Failed to create compute pipeline state");
+        return {};
+    }
+
+    const auto handle = m_pipeline_states_.Add(std::move(pipeline_state));
+    m_pipeline_state_cache_.emplace(hash, handle);
+    return handle;
+}
+
 SamplerHandle D3D12RenderDevice::CreateSampler(const SamplerDesc &desc)
 {
     D3D12Sampler sampler;
@@ -908,10 +1008,12 @@ void D3D12RenderDevice::Destroy(const BufferHandle buffer_handle)
 
     auto resources = buffer->resources;
     auto srv = buffer->srv;
+    auto uav = buffer->uav;
     m_buffers_.Remove(buffer_handle);
-    DeferRelease([this, resources, srv]() mutable {
+    DeferRelease([this, resources, srv, uav]() mutable {
         for (auto &descriptor : srv)
             m_cpu_srv_heap_.Free(descriptor);
+        m_cpu_srv_heap_.Free(uav);
         // resourcesはここで解放される
         (void)resources;
     });

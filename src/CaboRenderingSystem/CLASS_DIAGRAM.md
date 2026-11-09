@@ -367,6 +367,10 @@ classDiagram
         +SetScissor(ScissorRect)*
         +SetPipeline(PipelineHandle)*
         +SetBindings(Bindings)*
+        +SetComputePipelineState(PipelineStateHandle)*
+        +SetComputeBindings(Bindings)*
+        +Dispatch(x, y, z)*
+        +UavBarrier(handle)*
         +SetVertexBuffer(BufferHandle, stride, offset)*
         +SetIndexBuffer(BufferHandle, Format, offset)*
         +Draw(...)*
@@ -485,5 +489,5 @@ classDiagram
 
 ポイント
 - `ID3D12*` / `D3D12_*` / `DXGI_*` が出てくるのは `RHI/D3D12` の中だけ（`D3D12RenderDevice` と `D3D12CommandList` は .cpp 内の無名名前空間に隠している）。
-- 共通ルートシグネチャ: `b0` View / `b1` Material / `b2` Object（ルート CBV）、`t0..t7`（SRV テーブル）、`s0..s3`（サンプラーテーブル）。
+- 共通ルートシグネチャ: `b0` View / `b1` Material / `b2` Object（ルート CBV）、`t0..t7`（SRV テーブル）、`s0..s3`（サンプラーテーブル）、`u0..u7`（UAV テーブル）。
 - 動作確認用に `Samples/TriangleSample` があり、`IRenderDevice` / `ICommandList` だけを使って三角形を描く。
