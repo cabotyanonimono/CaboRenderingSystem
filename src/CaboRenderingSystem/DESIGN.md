@@ -138,7 +138,7 @@ RenderEngine（最上位。具象を組み立てて注入する）
 
 ### バッファの種類
 - 型を分けず、`BufferDesc` の **用途フラグ**（Constant / Structured / ReadWrite / Vertex / Index / Indirect）と **メモリ種別**（GpuOnly / Upload / Readback）で表す。シェーダーへの見せ方はバインディングで決める。
-- 最初に使うのは ConstantBuffer、Vertex/Index、Texture2D + Sampler、StructuredBuffer。UAV・ByteAddress・Indirect は GPU カリングや GPU ドリブン描画を始めるときに。
+- 最初に使うのは ConstantBuffer、Vertex/Index、Texture2D + Sampler、StructuredBuffer。UAV（ReadWrite バッファ / `TextureUsage::UnorderedAccess` テクスチャ）はコンピュートシェーダー用に対応済み。Indirect は GPU ドリブン描画を始めるときに。
 
 ### バインディング
 - パスは `SetBindings(Bindings)` で「どのスロットに何を見せるか」だけを書く。
@@ -149,6 +149,8 @@ RenderEngine（最上位。具象を組み立てて注入する）
   - `b2`: Object（ワールド行列など）
   - `t0..t7`: テクスチャ / StructuredBuffer
   - `s0..s3`: サンプラー
+  - `u0..u7`: UAV（`Bindings::unordered_access`）。グラフィックスとコンピュートで同じルートシグネチャを使う
+- コンピュートは `CreateComputePipelineState` → `SetComputePipelineState` / `SetComputeBindings` / `Dispatch`。同じ UAV を続けて使うときは `UavBarrier` を挟む。
 - `ConstantBinding` は CPU の値（実装側がアップロードリングにコピー）か、GPU バッファのハンドルのどちらかを渡す。
 - 将来バインドレスやパスごとのルートシグネチャが欲しくなったら、D3D12 用語ではなく「バインドグループ」などの抽象を追加する。
 

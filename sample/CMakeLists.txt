@@ -18,4 +18,8 @@ add_custom_command(TARGET Sample POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${PROJECT_SOURCE_DIR}/src/CaboRenderingSystem/Shaders
             $<TARGET_FILE_DIR:Sample>/Shaders
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/compute_test.hlsl
+            ${CMAKE_CURRENT_SOURCE_DIR}/particles.hlsl
+            $<TARGET_FILE_DIR:Sample>
         COMMAND_EXPAND_LISTS)

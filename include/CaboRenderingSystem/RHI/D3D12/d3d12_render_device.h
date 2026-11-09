@@ -27,6 +27,7 @@ enum D3D12RootParameter : uint32_t
     kRootParameter_Resources = kRootParameter_FrameConstants + kFrameConstantSlotCount, // t0..t7, space0
     kRootParameter_FrameResources, // t0..t7, space1
     kRootParameter_Samplers, // s0..s3, space0
+    kRootParameter_UnorderedAccess, // u0..u7, space0
     kRootParameter_Count
 };
 
@@ -41,6 +42,8 @@ struct D3D12Buffer
     // Uploadメモリの場合の、CPUから書き込めるアドレス（Mapしたまま）
     std::array<uint8_t *, kMaxFramesInFlight> mapped = {};
     std::array<CpuDescriptor, kMaxFramesInFlight> srv;
+    // ReadWriteのGpuOnlyバッファだけが持つ
+    CpuDescriptor uav;
     ResourceState state = ResourceState::Common;
     // Uploadメモリの場合の最新の内容。他のフレームのコピーへ反映するために使う
     std::vector<uint8_t> shadow;
@@ -68,6 +71,8 @@ struct D3D12Texture
     bool fixed_state = false;
     CpuDescriptor srv;
     CpuDescriptor rtv;
+    // mip 0を指すUAV
+    CpuDescriptor uav;
     // 全体を指すDSV
     CpuDescriptor dsv;
     // 配列テクスチャのスライスごとのDSV
@@ -89,6 +94,8 @@ struct D3D12Shader
 struct D3D12PipelineState
 {
     PipelineStateDesc desc;
+    ComputePipelineStateDesc compute_desc;
+    bool is_compute = false;
     ComPtr<ID3D12PipelineState> pipeline_state;
 };
 
@@ -164,6 +171,7 @@ private:
     GpuDescriptorRing m_gpu_srv_ring_;
     GpuDescriptorRing m_gpu_sampler_ring_;
     CpuDescriptor m_null_srv_;
+    CpuDescriptor m_null_uav_;
     CpuDescriptor m_default_sampler_;
 
     std::array<std::vector<UploadPage>, kMaxFramesInFlight> m_upload_pages_;
@@ -225,6 +233,8 @@ private:
     D3D12_GPU_VIRTUAL_ADDRESS GetBufferAddress(BufferHandle buffer);
     // ResourceBindingが指すもののSRV。何も指していなければ空のSRV（読むと0）
     D3D12_CPU_DESCRIPTOR_HANDLE GetResourceSrv(const ResourceBinding &binding);
+    // UnorderedAccessBindingが指すもののUAV。何も指していなければ空のUAV
+    D3D12_CPU_DESCRIPTOR_HANDLE GetResourceUav(const UnorderedAccessBinding &binding);
     // サンプラーのディスクリプタ。無効なハンドルなら既定のサンプラー（Linear / Wrap）
     D3D12_CPU_DESCRIPTOR_HANDLE GetSamplerDescriptor(SamplerHandle sampler);
 
@@ -243,6 +253,7 @@ public:
     TextureHandle CreateTexture(const TextureDesc &desc) override;
     ShaderHandle CreateShader(const ShaderSource &source) override;
     PipelineStateHandle CreatePipelineState(const PipelineStateDesc &desc) override;
+    PipelineStateHandle CreateComputePipelineState(const ComputePipelineStateDesc &desc) override;
     SamplerHandle CreateSampler(const SamplerDesc &desc) override;
 
     const ShaderReflection &GetReflection(ShaderHandle shader) const override;

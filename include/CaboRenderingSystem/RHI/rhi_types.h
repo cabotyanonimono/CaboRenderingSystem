@@ -14,7 +14,7 @@ constexpr uint32_t kMaxFramesInFlight = 2;
 // 1回の描画で同時に書き込める色の描画先の数（D3D12の上限と同じ）
 constexpr uint32_t kMaxRenderTargets = 8;
 // 共通ルートシグネチャのスロット数です
-//   space0（マテリアル）: b0..b3 / t0..t7 / s0..s3。シェーダー側はregisterを書かなくてよい（DXCが順に割り当てる）
+//   space0（マテリアル）: b0..b3 / t0..t7 / s0..s3 / u0..u7。シェーダー側はregisterを書かなくてよい（DXCが順に割り当てる）
 //   space1（エンジン）  : b0 View / b1 Object / b2 Lighting / t0..t7 ライト・影・ボーン
 //                         固定のサンプラー（s0: 影の比較用, s1: 線形Clamp）
 constexpr uint32_t kConstantSlotCount = 4;
@@ -22,6 +22,7 @@ constexpr uint32_t kFrameConstantSlotCount = 3;
 constexpr uint32_t kResourceSlotCount = 8;
 constexpr uint32_t kFrameResourceSlotCount = 8;
 constexpr uint32_t kSamplerSlotCount = 4;
+constexpr uint32_t kUnorderedAccessSlotCount = 8;
 // 配列テクスチャで、全スライスを指す場合のスライス番号
 constexpr uint32_t kAllSlices = UINT32_MAX;
 
@@ -148,6 +149,7 @@ enum class TextureUsage : uint32_t
     ShaderResource = 1 << 0,
     RenderTarget = 1 << 1,
     DepthStencil = 1 << 2,
+    UnorderedAccess = 1 << 3,
 };
 
 /// <summary>
@@ -208,7 +210,8 @@ struct TextureDesc
 enum class ShaderStage : uint8_t
 {
     Vertex,
-    Pixel
+    Pixel,
+    Compute,
 };
 
 /// <summary>
@@ -342,6 +345,20 @@ struct CRS_API PipelineStateDesc
     bool operator==(const PipelineStateDesc &) const = default;
     /// <summary>
     /// PSOのキャッシュのキーにするハッシュ値です。全メンバーを順番も区別して混ぜます。
+    /// </summary>
+    size_t Hash() const;
+};
+
+/// <summary>
+/// コンピュートシェーダーのPSOを作るときの設定です。IRenderDevice::CreateComputePipelineStateは同じ設定のPSOをキャッシュから返します。
+/// </summary>
+struct CRS_API ComputePipelineStateDesc
+{
+    ShaderHandle compute_shader;
+
+    bool operator==(const ComputePipelineStateDesc &) const = default;
+    /// <summary>
+    /// PSOのキャッシュのキーにするハッシュ値です。
     /// </summary>
     size_t Hash() const;
 };
@@ -489,6 +506,16 @@ struct ResourceBinding
 };
 
 /// <summary>
+/// u レジスタに見せる読み書き可能なリソースです。テクスチャかバッファのどちらかを入れます。両方空なら空のUAVになります。
+/// テクスチャはTextureUsage::UnorderedAccess、バッファはBufferUsage::ReadWrite（GpuOnly）で作ったものだけ使えます。
+/// </summary>
+struct UnorderedAccessBinding
+{
+    TextureHandle texture;
+    BufferHandle buffer;
+};
+
+/// <summary>
 /// space1 の定数のスロット番号です。
 /// </summary>
 enum FrameConstantSlot : uint32_t
@@ -513,6 +540,8 @@ struct Bindings
     std::array<ResourceBinding, kFrameResourceSlotCount> frame_resources = {};
     // s0..s3, space0（マテリアル）。無効なハンドルは既定のサンプラーになる
     std::array<SamplerHandle, kSamplerSlotCount> samplers = {};
+    // u0..u7, space0。書き込む前にUnorderedAccessへTransitionしておく
+    std::array<UnorderedAccessBinding, kUnorderedAccessSlotCount> unordered_access = {};
 };
 
 /// <summary>

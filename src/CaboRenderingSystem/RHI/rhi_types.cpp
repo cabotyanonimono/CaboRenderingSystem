@@ -42,4 +42,12 @@ size_t PipelineStateDesc::Hash() const
     HashCombine(seed, sample_count);
     return seed;
 }
+
+size_t ComputePipelineStateDesc::Hash() const
+{
+    size_t seed = 0;
+    HashCombine(seed, compute_shader.index);
+    HashCombine(seed, compute_shader.generation);
+    return seed;
+}
 }

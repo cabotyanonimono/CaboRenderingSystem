@@ -35,6 +35,10 @@ public:
     /// </summary>
     virtual PipelineStateHandle CreatePipelineState(const PipelineStateDesc &desc) = 0;
     /// <summary>
+    /// コンピュートシェーダーのPSOを作成します。同じ設定のPSOはキャッシュから返します。破棄はDestroy(PipelineStateHandle)で行います。
+    /// </summary>
+    virtual PipelineStateHandle CreateComputePipelineState(const ComputePipelineStateDesc &desc) = 0;
+    /// <summary>
     /// サンプラーを作成します。
     /// </summary>
     virtual SamplerHandle CreateSampler(const SamplerDesc &desc) = 0;
