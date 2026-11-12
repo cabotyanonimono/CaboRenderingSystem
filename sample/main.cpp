@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include <CaboRenderingSystem/Material/compute_material.h>
 #include <CaboRenderingSystem/render_engine.h>
 
 using namespace CRS;
@@ -42,7 +43,7 @@ struct ComputeTest
     static constexpr uint32_t kMultiplier = 2;
 
     ShaderHandle shader;
-    PipelineStateHandle pipeline_state;
+    ComputeMaterial material;
     BufferHandle buffer;
     ReadbackTicket ticket;
     bool dispatched = false;
@@ -59,7 +60,7 @@ struct ComputeTest
         source.entry_point = L"CSMain";
         source.stage = ShaderStage::Compute;
         shader = device.CreateShader(source);
-        pipeline_state = device.CreateComputePipelineState({shader});
+        const bool pipeline_ok = material.SetShader(device, shader);
 
         BufferDesc desc;
         desc.size = kCount * sizeof(uint32_t);
@@ -67,7 +68,10 @@ struct ComputeTest
         desc.usage = BufferUsage::Structured | BufferUsage::ReadWrite;
         desc.debug_name = "ComputeTest Output";
         buffer = device.CreateBuffer(desc);
-        return pipeline_state.IsValid() && buffer.IsValid();
+        material.SetUInt("g_count", kCount);
+        material.SetUInt("g_multiplier", kMultiplier);
+        material.SetBuffer("g_output", buffer);
+        return pipeline_ok && buffer.IsValid();
     }
 
     /// <summary>
@@ -78,19 +82,9 @@ struct ComputeTest
         if (dispatched)
             return;
 
-        struct Params
-        {
-            uint32_t count;
-            uint32_t multiplier;
-        } params = {kCount, kMultiplier};
-
         ProfileScope scope(command_list, "ComputeTest");
         command_list.Transition(buffer, ResourceState::UnorderedAccess);
-        command_list.SetComputePipelineState(pipeline_state);
-        Bindings bindings;
-        bindings.constants[0] = ConstantBinding::FromValue(params);
-        bindings.unordered_access[0].buffer = buffer;
-        command_list.SetComputeBindings(bindings);
+        material.Apply(command_list);
         command_list.Dispatch((kCount + 63) / 64);
         ticket = device.RequestReadback(buffer);
         dispatched = true;
@@ -123,7 +117,7 @@ struct ComputeTest
     void Destroy(IRenderDevice &device)
     {
         device.Destroy(buffer);
-        device.Destroy(pipeline_state);
+        device.Destroy(material.PipelineState());
         device.Destroy(shader);
     }
 
@@ -408,7 +402,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
         DrawCube(immediate, world, Color(1.f, 0.6f, 0.1f, 1.f));
 
         g_engine->BeginFrame();
-        if (!g_compute_test.dispatched && g_compute_test.pipeline_state.IsValid())
+        if (!g_compute_test.dispatched && g_compute_test.material.PipelineState().IsValid())
             g_compute_test.Record(g_engine->Device(), g_engine->CommandList());
         g_engine->Render(time, delta);
         if (particles_ready)
