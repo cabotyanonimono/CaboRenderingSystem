@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -84,6 +85,8 @@ struct ShaderReflection
 {
     std::vector<ConstantBufferInfo> constant_buffers;
     std::vector<ShaderResourceInfo> resources;
+    // コンピュートシェーダーの[numthreads]（それ以外のシェーダーは0）
+    std::array<uint32_t, 3> thread_group_size = {};
 
     /// <summary>
     /// 指定したレジスタのcbufferを探します。
