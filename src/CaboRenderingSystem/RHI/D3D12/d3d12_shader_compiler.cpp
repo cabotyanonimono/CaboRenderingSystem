@@ -166,6 +166,8 @@ bool D3D12ShaderCompiler::Reflect(const std::vector<uint8_t> &bytecode, ShaderRe
 
     D3D12_SHADER_DESC shader_desc;
     reflection->GetDesc(&shader_desc);
+    reflection->GetThreadGroupSize(&out_reflection.thread_group_size[0], &out_reflection.thread_group_size[1],
+                                   &out_reflection.thread_group_size[2]);
 
     for (UINT i = 0; i < shader_desc.BoundResources; ++i)
     {

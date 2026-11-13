@@ -84,8 +84,7 @@ struct ComputeTest
 
         ProfileScope scope(command_list, "ComputeTest");
         command_list.Transition(buffer, ResourceState::UnorderedAccess);
-        material.Apply(command_list);
-        command_list.Dispatch((kCount + 63) / 64);
+        material.DispatchThreads(command_list, kCount);
         ticket = device.RequestReadback(buffer);
         dispatched = true;
     }
