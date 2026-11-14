@@ -129,7 +129,7 @@ void ShadowPass::Execute(const PassContext &context)
         command_list.SetBindings(bindings);
         command_list.SetVertexBuffer(item.mesh->vertex_buffer, item.mesh->vertex_layout->stride);
         command_list.SetIndexBuffer(item.mesh->index_buffer);
-        command_list.DrawIndexed(item.range->index_count, 1, item.range->first_index, item.range->base_vertex);
+        command_list.DrawIndexed(item.range->index_count, item.mesh->instance_count, item.range->first_index, item.range->base_vertex);
     }
 
     command_list.EndRenderPass();
@@ -229,7 +229,7 @@ void ForwardPass::Execute(const PassContext &context)
         command_list.SetBindings(bindings);
         command_list.SetVertexBuffer(item.mesh->vertex_buffer, item.mesh->vertex_layout->stride);
         command_list.SetIndexBuffer(item.mesh->index_buffer);
-        command_list.DrawIndexed(item.range->index_count, 1, item.range->first_index, item.range->base_vertex);
+        command_list.DrawIndexed(item.range->index_count, item.mesh->instance_count, item.range->first_index, item.range->base_vertex);
     }
 
     command_list.EndRenderPass();
