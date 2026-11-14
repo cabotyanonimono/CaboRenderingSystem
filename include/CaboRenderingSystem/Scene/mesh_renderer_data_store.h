@@ -47,6 +47,7 @@ struct MeshRendererData
     // CameraCommon::culling_maskとANDを取り、0なら描かない
     uint32_t layer_mask = 1;
     bool cast_shadow = true;
+    uint32_t instance_count = 1;
 };
 
 /// <summary>
