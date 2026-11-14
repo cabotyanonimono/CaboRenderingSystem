@@ -5,7 +5,7 @@ vcpkg_check_linkage(ONLY_DYNAMIC_LIBRARY)
 vcpkg_from_git(
     OUT_SOURCE_PATH SOURCE_PATH
     URL https://github.com/cabotyanonimono/CaboRenderingSystem.git
-    REF f2bdea9dda87f7e2bb1c4a943f3b3367f4279e93
+    REF f9e069d64c1d84584393d22fbb6b90fefec4afd3
 )
 
 vcpkg_cmake_configure(
